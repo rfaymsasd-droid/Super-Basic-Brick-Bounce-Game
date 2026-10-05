@@ -8,9 +8,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #000;
+  background: #ffbe3b;
   color: #fff;
-  font-family: "Courier New", monospace;
+  font-family: 'Times New Roman', Times, serif;
 }
 
 main {
@@ -24,7 +24,7 @@ canvas {
   display: block;
   width: 100%;
   height: auto;
-  border: 2px solid #fff;
+  border: 2px solid #ffbe3b;
   background: #000;
 }
 
