@@ -1,20 +1,13 @@
-// ============================================================
-// bricks.js: where the bricks are, and how they are drawn
-// ============================================================
-
 const BRICK_COLUMNS = 8;
 const BRICK_ROWS = 4;
 const BRICK_WIDTH = 60;
 const BRICK_HEIGHT = 20;
-const BRICK_GAP = 6;     // empty space between bricks
-const BRICKS_TOP = 50;   // how far down the first row starts
+const BRICK_GAP = 6;
+const BRICKS_TOP = 50;
 
-// Builds the list of bricks. Each brick is an object with an
-// x, y, width, and height.
 function makeBricks() {
   const list = [];
 
-  // Center the whole block of bricks on the screen.
   const totalWidth = BRICK_COLUMNS * BRICK_WIDTH + (BRICK_COLUMNS - 1) * BRICK_GAP;
   const left = (WIDTH - totalWidth) / 2;
 
@@ -32,7 +25,6 @@ function makeBricks() {
   return list;
 }
 
-// Draws every brick in the list.
 function drawBricks() {
   ctx.fillStyle = "white";
   for (const brick of bricks) {
