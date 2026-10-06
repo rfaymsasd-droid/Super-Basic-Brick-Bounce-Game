@@ -54,6 +54,7 @@ function bounceOffBricks() {
       }
     }
 
+    bricks.splice(bricks.indexOf(brick), 1);
     break;
   }
 }
