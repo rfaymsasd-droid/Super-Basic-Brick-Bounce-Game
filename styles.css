@@ -25,6 +25,8 @@ canvas {
   width: 100%;
   height: auto;
   border: 2px solid #fff;
+  border-radius: 20px;
+  corner-shape: squircle;
   background: #000;
 }
 
