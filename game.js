@@ -101,8 +101,8 @@ function draw() {
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
   ctx.fillStyle = "white";
-  ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
-  ctx.fillRect(ball.x, ball.y, ball.width, ball.height);
+  drawSquircle(paddle.x, paddle.y, paddle.width, paddle.height);
+  drawSquircle(ball.x, ball.y, ball.width, ball.height);
 
   drawBricks();
 
@@ -116,6 +116,26 @@ function draw() {
     ctx.font = "18px sans-serif";
     ctx.fillText("Press R to restart", WIDTH / 2, HEIGHT / 2 + 28);
   }
+}
+
+function drawSquircle(x, y, width, height) {
+  const radius = Math.min(width, height) / 3;
+  const control = radius * 0.8;
+  const right = x + width;
+  const bottom = y + height;
+
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(right - radius, y);
+  ctx.bezierCurveTo(right - radius + control, y, right, y + radius - control, right, y + radius);
+  ctx.lineTo(right, bottom - radius);
+  ctx.bezierCurveTo(right, bottom - radius + control, right - radius + control, bottom, right - radius, bottom);
+  ctx.lineTo(x + radius, bottom);
+  ctx.bezierCurveTo(x + radius - control, bottom, x, bottom - radius + control, x, bottom - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.bezierCurveTo(x, y + radius - control, x + radius - control, y, x + radius, y);
+  ctx.closePath();
+  ctx.fill();
 }
 
 const STEP = 1000 / 60;
