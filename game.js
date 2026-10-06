@@ -33,12 +33,16 @@ const paddle = {
 
 
 let bricks = [];
+let won = false;
 
 
 const keys = {};
 
 document.addEventListener("keydown", function (event) {
   keys[event.key.toLowerCase()] = true;
+  if (won && event.key.toLowerCase() === "r") {
+    resetGame();
+  }
   if (event.key.startsWith("Arrow")) {
     event.preventDefault();
   }
@@ -50,12 +54,21 @@ document.addEventListener("keyup", function (event) {
 
 
 function update() {
+  if (won) {
+    return;
+  }
+
   movePaddle();
   moveBall();
 
   bounceOffWalls();
   bounceOffPaddle();
   bounceOffBricks();
+
+  if (bricks.length === 0) {
+    won = true;
+    return;
+  }
 
   if (ball.y > HEIGHT) {
     resetBall();
@@ -92,6 +105,17 @@ function draw() {
   ctx.fillRect(ball.x, ball.y, ball.width, ball.height);
 
   drawBricks();
+
+  if (won) {
+    ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    ctx.fillStyle = "white";
+    ctx.textAlign = "center";
+    ctx.font = "bold 42px sans-serif";
+    ctx.fillText("YOU WIN!", WIDTH / 2, HEIGHT / 2 - 12);
+    ctx.font = "18px sans-serif";
+    ctx.fillText("Press R to restart", WIDTH / 2, HEIGHT / 2 + 28);
+  }
 }
 
 const STEP = 1000 / 60;
@@ -115,9 +139,15 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-function start() {
+function resetGame() {
   bricks = makeBricks();
   resetBall();
+  paddle.x = WIDTH / 2 - paddle.width / 2;
+  won = false;
+}
+
+function start() {
+  resetGame();
   lastTime = performance.now();
   requestAnimationFrame(frame);
 }
