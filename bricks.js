@@ -28,6 +28,22 @@ function makeBricks() {
 function drawBricks() {
   ctx.fillStyle = "white";
   for (const brick of bricks) {
-    ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
+    const radius = Math.min(brick.width, brick.height) / 3;
+    const control = radius * 0.8;
+    const right = brick.x + brick.width;
+    const bottom = brick.y + brick.height;
+
+    ctx.beginPath();
+    ctx.moveTo(brick.x + radius, brick.y);
+    ctx.lineTo(right - radius, brick.y);
+    ctx.bezierCurveTo(right - radius + control, brick.y, right, brick.y + radius - control, right, brick.y + radius);
+    ctx.lineTo(right, bottom - radius);
+    ctx.bezierCurveTo(right, bottom - radius + control, right - radius + control, bottom, right - radius, bottom);
+    ctx.lineTo(brick.x + radius, bottom);
+    ctx.bezierCurveTo(brick.x + radius - control, bottom, brick.x, bottom - radius + control, brick.x, bottom - radius);
+    ctx.lineTo(brick.x, brick.y + radius);
+    ctx.bezierCurveTo(brick.x, brick.y + radius - control, brick.x + radius - control, brick.y, brick.x + radius, brick.y);
+    ctx.closePath();
+    ctx.fill();
   }
 }
