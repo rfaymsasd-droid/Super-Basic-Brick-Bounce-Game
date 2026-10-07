@@ -20,6 +20,10 @@ function bounceOffWalls() {
     ball.y = 0;
     ball.vy = -ball.vy;
   }
+  if (ball.y + ball.height > HEIGHT) {
+    ball.y = HEIGHT - ball.height;
+    ball.vy = -Math.abs(ball.vy);
+  }
 }
 
 function bounceOffPaddle() {
@@ -55,6 +59,19 @@ function bounceOffBricks() {
     }
 
     bricks.splice(bricks.indexOf(brick), 1);
+    break;
+  }
+}
+
+function bounceOffInvaders() {
+  for (let index = invaders.length - 1; index >= 0; index -= 1) {
+    const invader = invaders[index];
+    if (!boxesTouch(ball, invader)) {
+      continue;
+    }
+
+    ball.vy = -ball.vy;
+    invaders.splice(index, 1);
     break;
   }
 }

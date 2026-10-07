@@ -6,6 +6,13 @@ const HEIGHT = canvas.height;
 
 const BALL_SPEED = 4;
 const STARTING_LIVES = 3;
+const INVADER_COLUMNS = 10;
+const INVADER_ROWS = 3;
+const INVADER_WIDTH = 30;
+const INVADER_HEIGHT = 20;
+const INVADER_GAP_X = 24;
+const INVADER_GAP_Y = 18;
+const INVADER_BULLET_SPEED = 3.5;
 
 const ball = {
   x: 0,
@@ -16,29 +23,25 @@ const ball = {
   vy: 0
 };
 
-function resetBall() {
-  ball.x = WIDTH / 2 - ball.width / 2;
-  ball.y = HEIGHT / 2 - ball.height / 2;
-  ball.vx = BALL_SPEED;
-  ball.vy = BALL_SPEED;
-}
-
-
 const paddle = {
-  x: WIDTH / 2 - 45,
-  y: HEIGHT - 30,
-  width: 90,
-  height: 12,
-  speed: 6
+  x: WIDTH / 2 - 36,
+  y: HEIGHT - 56,
+  width: 72,
+  height: 16,
+  speed: 7
 };
 
-
 let bricks = [];
+let invaders = [];
+let invaderBullets = [];
+let invaderDirection = 1;
+let invaderFireTimer = 0;
+let ballAttached = true;
+let started = false;
 let level = 1;
 let lives = STARTING_LIVES;
 let paused = false;
 let gameOver = false;
-
 
 const keys = {};
 
@@ -46,11 +49,18 @@ document.addEventListener("keydown", function (event) {
   const key = event.key.toLowerCase();
   keys[key] = true;
 
-  if (key === "r") {
+  if (event.code === "Space") {
+    event.preventDefault();
+    if (!event.repeat && !paused && !gameOver) {
+      started = true;
+      launchBall();
+    }
+  } else if (key === "r" && !event.repeat) {
     resetGame();
   } else if (key === "p" && !event.repeat && !gameOver) {
     paused = !paused;
   }
+
   if (event.key.startsWith("Arrow")) {
     event.preventDefault();
   }
@@ -60,56 +70,157 @@ document.addEventListener("keyup", function (event) {
   keys[event.key.toLowerCase()] = false;
 });
 
-
 function update() {
   if (paused || gameOver) {
     return;
   }
 
   movePaddle();
-  moveBall();
+  if (ballAttached) {
+    positionBall();
+  }
+  if (!started) {
+    return;
+  }
 
+  moveInvaders();
+  moveBall();
   bounceOffWalls();
   bounceOffPaddle();
   bounceOffBricks();
+  bounceOffInvaders();
+  updateInvaderBullets();
 
   if (bricks.length === 0) {
     level += 1;
     bricks = makeBricks();
-    resetBall();
-    return;
-  }
-
-  if (ball.y > HEIGHT) {
-    lives -= 1;
+    invaders = makeInvaders();
+    invaderBullets = [];
+    invaderDirection = 1;
+    invaderFireTimer = 0;
+    started = false;
+    ballAttached = true;
+    positionBall();
     updateStatus();
-    if (lives === 0) {
-      gameOver = true;
-    } else {
-      resetBall();
-    }
   }
 }
 
 function movePaddle() {
   if (keys["arrowleft"] || keys["a"]) {
-    paddle.x = paddle.x - paddle.speed;
+    paddle.x -= paddle.speed;
   }
   if (keys["arrowright"] || keys["d"]) {
-    paddle.x = paddle.x + paddle.speed;
+    paddle.x += paddle.speed;
   }
 
-  if (paddle.x < 0) {
-    paddle.x = 0;
+  paddle.x = Math.max(0, Math.min(WIDTH - paddle.width, paddle.x));
+}
+
+function positionBall() {
+  ball.x = paddle.x + (paddle.width - ball.width) / 2;
+  ball.y = paddle.y - ball.height - 2;
+}
+
+function launchBall() {
+  if (!ballAttached) {
+    return;
   }
-  if (paddle.x + paddle.width > WIDTH) {
-    paddle.x = WIDTH - paddle.width;
-  }
+  ballAttached = false;
+  ball.vx = BALL_SPEED * 0.65;
+  ball.vy = -BALL_SPEED;
 }
 
 function moveBall() {
-  ball.x = ball.x + ball.vx;
-  ball.y = ball.y + ball.vy;
+  ball.x += ball.vx;
+  ball.y += ball.vy;
+}
+
+function moveInvaders() {
+  if (invaders.length === 0) {
+    return;
+  }
+
+  const speed = 0.7 + Math.min(level * 0.08, 1.2);
+  const leftEdge = Math.min(...invaders.map((invader) => invader.x)) + invaderDirection * speed;
+  const rightEdge = Math.max(...invaders.map((invader) => invader.x + invader.width)) + invaderDirection * speed;
+
+  if (leftEdge < 18 || rightEdge > WIDTH - 18) {
+    invaderDirection *= -1;
+    for (const invader of invaders) {
+      invader.y += 14;
+    }
+  }
+
+  for (const invader of invaders) {
+    invader.x += invaderDirection * speed;
+  }
+
+  invaderFireTimer += 1;
+  const fireInterval = Math.max(36, 90 - level * 4);
+  if (invaderFireTimer >= fireInterval) {
+    invaderFireTimer = 0;
+    const shooter = invaders[Math.floor(Math.random() * invaders.length)];
+    if (shooter) {
+      invaderBullets.push({
+        x: shooter.x + shooter.width / 2 - 2,
+        y: shooter.y + shooter.height,
+        width: 4,
+        height: 12,
+        speed: INVADER_BULLET_SPEED
+      });
+    }
+  }
+}
+
+function updateInvaderBullets() {
+  for (let bulletIndex = invaderBullets.length - 1; bulletIndex >= 0; bulletIndex -= 1) {
+    const bullet = invaderBullets[bulletIndex];
+    bullet.y += bullet.speed;
+
+    if (bullet.y > HEIGHT) {
+      invaderBullets.splice(bulletIndex, 1);
+      continue;
+    }
+
+    let hitBrick = false;
+    for (let brickIndex = bricks.length - 1; brickIndex >= 0; brickIndex -= 1) {
+      const brick = bricks[brickIndex];
+      if (!boxesTouch(bullet, brick)) {
+        continue;
+      }
+
+      brick.health -= 1;
+      if (brick.health <= 0) {
+        bricks.splice(brickIndex, 1);
+      }
+      invaderBullets.splice(bulletIndex, 1);
+      hitBrick = true;
+      break;
+    }
+    if (hitBrick) {
+      continue;
+    }
+
+    if (boxesTouch(bullet, paddle)) {
+      loseLife();
+      return;
+    }
+  }
+}
+
+function loseLife() {
+  lives -= 1;
+  updateStatus();
+  invaderBullets = [];
+
+  if (lives === 0) {
+    gameOver = true;
+    return;
+  }
+
+  started = false;
+  ballAttached = true;
+  positionBall();
 }
 
 function draw() {
@@ -119,18 +230,44 @@ function draw() {
   ctx.fillStyle = "white";
   drawSquircle(paddle.x, paddle.y, paddle.width, paddle.height);
   drawSquircle(ball.x, ball.y, ball.width, ball.height);
-
   drawBricks();
+  drawInvaders();
+  drawInvaderBullets();
 
-  if (paused || gameOver) {
-    ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+  if (paused || gameOver || !started) {
+    ctx.fillStyle = "rgba(0, 0, 0, 0.72)";
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
     ctx.fillStyle = "white";
     ctx.textAlign = "center";
     ctx.font = "bold 42px sans-serif";
-    ctx.fillText(gameOver ? "GAME OVER" : "PAUSED", WIDTH / 2, HEIGHT / 2 - 12);
+    const title = gameOver ? "GAME OVER" : paused ? "PAUSED" : "READY";
+    ctx.fillText(title, WIDTH / 2, HEIGHT / 2 - 12);
     ctx.font = "18px sans-serif";
-    ctx.fillText(gameOver ? "Press R to restart" : "Press P to resume", WIDTH / 2, HEIGHT / 2 + 28);
+    const prompt = gameOver ? "Press R to restart" : paused ? "Press P to resume" : "Press SPACE to launch";
+    ctx.fillText(prompt, WIDTH / 2, HEIGHT / 2 + 28);
+  }
+}
+
+function drawInvaders() {
+  ctx.fillStyle = "white";
+  for (const invader of invaders) {
+    const { x, y, width, height } = invader;
+    ctx.fillRect(x + 7, y, width - 14, 5);
+    ctx.fillRect(x + 3, y + 5, width - 6, 8);
+    ctx.fillRect(x, y + 11, width, 5);
+    ctx.fillRect(x + 5, y + 16, 5, height - 16);
+    ctx.fillRect(x + width - 10, y + 16, 5, height - 16);
+    ctx.fillStyle = "black";
+    ctx.fillRect(x + 8, y + 7, 3, 3);
+    ctx.fillRect(x + width - 11, y + 7, 3, 3);
+    ctx.fillStyle = "white";
+  }
+}
+
+function drawInvaderBullets() {
+  ctx.fillStyle = "white";
+  for (const bullet of invaderBullets) {
+    ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
   }
 }
 
@@ -182,12 +319,18 @@ function frame(now) {
 
 function resetGame() {
   bricks = makeBricks();
-  resetBall();
+  invaders = makeInvaders();
+  invaderBullets = [];
+  invaderDirection = 1;
+  invaderFireTimer = 0;
   paddle.x = WIDTH / 2 - paddle.width / 2;
   level = 1;
   lives = STARTING_LIVES;
+  started = false;
+  ballAttached = true;
   paused = false;
   gameOver = false;
+  positionBall();
   updateStatus();
 }
 
