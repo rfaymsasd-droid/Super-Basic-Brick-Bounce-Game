@@ -8,8 +8,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #000117;
-  color: #d9ff00;
+  background: #000;
+  color: #FFF;
   font-family: 'Times New Roman', Times, serif;
 }
 
@@ -20,14 +20,25 @@ main {
   text-align: center;
 }
 
+.game-status {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 4px 10px;
+  font-size: 16px;
+}
+
+.game-status strong {
+  padding-left: 4px;
+}
+
 canvas {
   display: block;
   width: 100%;
   height: auto;
-  border: 2px solid #d9ff00;
+  border: 2px solid #FFF;
   border-radius: 20px;
   corner-shape: squircle;
-  background: #000117;
+  background: #000;
 }
 
 p {

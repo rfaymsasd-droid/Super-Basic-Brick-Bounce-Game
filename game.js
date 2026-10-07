@@ -5,6 +5,7 @@ const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
 
 const BALL_SPEED = 4;
+const STARTING_LIVES = 3;
 
 const ball = {
   x: 0,
@@ -33,15 +34,22 @@ const paddle = {
 
 
 let bricks = [];
-let won = false;
+let level = 1;
+let lives = STARTING_LIVES;
+let paused = false;
+let gameOver = false;
 
 
 const keys = {};
 
 document.addEventListener("keydown", function (event) {
-  keys[event.key.toLowerCase()] = true;
-  if (won && event.key.toLowerCase() === "r") {
+  const key = event.key.toLowerCase();
+  keys[key] = true;
+
+  if (key === "r") {
     resetGame();
+  } else if (key === "p" && !event.repeat && !gameOver) {
+    paused = !paused;
   }
   if (event.key.startsWith("Arrow")) {
     event.preventDefault();
@@ -54,7 +62,7 @@ document.addEventListener("keyup", function (event) {
 
 
 function update() {
-  if (won) {
+  if (paused || gameOver) {
     return;
   }
 
@@ -66,12 +74,20 @@ function update() {
   bounceOffBricks();
 
   if (bricks.length === 0) {
-    won = true;
+    level += 1;
+    bricks = makeBricks();
+    resetBall();
     return;
   }
 
   if (ball.y > HEIGHT) {
-    resetBall();
+    lives -= 1;
+    updateStatus();
+    if (lives === 0) {
+      gameOver = true;
+    } else {
+      resetBall();
+    }
   }
 }
 
@@ -106,16 +122,21 @@ function draw() {
 
   drawBricks();
 
-  if (won) {
+  if (paused || gameOver) {
     ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
     ctx.fillStyle = "white";
     ctx.textAlign = "center";
     ctx.font = "bold 42px sans-serif";
-    ctx.fillText("YOU WIN!", WIDTH / 2, HEIGHT / 2 - 12);
+    ctx.fillText(gameOver ? "GAME OVER" : "PAUSED", WIDTH / 2, HEIGHT / 2 - 12);
     ctx.font = "18px sans-serif";
-    ctx.fillText("Press R to restart", WIDTH / 2, HEIGHT / 2 + 28);
+    ctx.fillText(gameOver ? "Press R to restart" : "Press P to resume", WIDTH / 2, HEIGHT / 2 + 28);
   }
+}
+
+function updateStatus() {
+  document.getElementById("level").textContent = level;
+  document.getElementById("lives").textContent = lives;
 }
 
 function drawSquircle(x, y, width, height) {
@@ -163,7 +184,11 @@ function resetGame() {
   bricks = makeBricks();
   resetBall();
   paddle.x = WIDTH / 2 - paddle.width / 2;
-  won = false;
+  level = 1;
+  lives = STARTING_LIVES;
+  paused = false;
+  gameOver = false;
+  updateStatus();
 }
 
 function start() {

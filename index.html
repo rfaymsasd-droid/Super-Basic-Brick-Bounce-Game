@@ -8,10 +8,12 @@
   </head>
   <body>
     <main>
+      <div class="game-status" aria-live="polite">
+        <span>Level <strong id="level">1</strong></span>
+        <span>Lives <strong id="lives">3</strong></span>
+      </div>
       <canvas id="game" width="600" height="450" aria-label="Block Breaker game"></canvas>
       <p>Move the paddle with the left and right arrow keys, or A and D.</p>
-      <p>Press R to restart.</p>
-      <p>Press P to pause.</p>
    </main>
 
    <script src="game.js"></script>
