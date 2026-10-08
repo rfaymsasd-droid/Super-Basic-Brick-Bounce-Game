@@ -20,21 +20,22 @@ function bounceOffWalls() {
     ball.y = 0;
     ball.vy = -ball.vy;
   }
-  if (ball.y + ball.height > HEIGHT) {
-    ball.y = HEIGHT - ball.height;
-    ball.vy = -Math.abs(ball.vy);
-  }
 }
 
 function bounceOffPaddle() {
   if (boxesTouch(ball, paddle) && ball.vy > 0) {
     ball.y = paddle.y - ball.height;
-    ball.vy = -ball.vy;
+    const impactOffset = (ball.x + ball.width / 2 - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+    const angle = Math.max(-1, Math.min(1, impactOffset)) * Math.PI / 3;
+    const speed = BALL_SPEED + Math.min((level - 1) * 0.2, 1.5);
+    ball.vx = Math.sin(angle) * speed;
+    ball.vy = -Math.cos(angle) * speed;
   }
 }
 
 function bounceOffBricks() {
-  for (const brick of bricks) {
+  for (let index = bricks.length - 1; index >= 0; index -= 1) {
+    const brick = bricks[index];
     if (!boxesTouch(ball, brick)) {
       continue;
     }
@@ -58,7 +59,11 @@ function bounceOffBricks() {
       }
     }
 
-    bricks.splice(bricks.indexOf(brick), 1);
+    brick.health -= 1;
+    registerTargetHit(10);
+    if (brick.health <= 0) {
+      bricks.splice(index, 1);
+    }
     break;
   }
 }
@@ -72,6 +77,7 @@ function bounceOffInvaders() {
 
     ball.vy = -ball.vy;
     invaders.splice(index, 1);
+    registerTargetHit(50);
     break;
   }
 }

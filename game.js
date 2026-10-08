@@ -6,6 +6,7 @@ const HEIGHT = canvas.height;
 
 const BALL_SPEED = 4;
 const STARTING_LIVES = 3;
+const COMBO_DURATION = 180;
 const INVADER_COLUMNS = 10;
 const INVADER_ROWS = 3;
 const INVADER_WIDTH = 30;
@@ -40,6 +41,10 @@ let ballAttached = true;
 let started = false;
 let level = 1;
 let lives = STARTING_LIVES;
+let score = 0;
+let highScore = loadHighScore();
+let combo = 0;
+let comboTimer = 0;
 let paused = false;
 let gameOver = false;
 
@@ -91,18 +96,30 @@ function update() {
   bounceOffInvaders();
   updateInvaderBullets();
 
-  if (bricks.length === 0) {
+  if (comboTimer > 0) {
+    comboTimer -= 1;
+    if (comboTimer === 0) {
+      combo = 0;
+    }
+  }
+
+  if (!gameOver && ball.y > HEIGHT) {
+    loseLife();
+  }
+
+  if (!gameOver && bricks.length === 0 && invaders.length === 0) {
     level += 1;
-    bricks = makeBricks();
-    invaders = makeInvaders();
+    bricks = makeBricks(level);
+    invaders = makeInvaders(level);
     invaderBullets = [];
     invaderDirection = 1;
     invaderFireTimer = 0;
     started = false;
     ballAttached = true;
     positionBall();
-    updateStatus();
   }
+
+  updateStatus();
 }
 
 function movePaddle() {
@@ -156,7 +173,7 @@ function moveInvaders() {
   }
 
   invaderFireTimer += 1;
-  const fireInterval = Math.max(36, 90 - level * 4);
+  const fireInterval = Math.max(28, 90 - level * 5);
   if (invaderFireTimer >= fireInterval) {
     invaderFireTimer = 0;
     const shooter = invaders[Math.floor(Math.random() * invaders.length)];
@@ -182,26 +199,8 @@ function updateInvaderBullets() {
       continue;
     }
 
-    let hitBrick = false;
-    for (let brickIndex = bricks.length - 1; brickIndex >= 0; brickIndex -= 1) {
-      const brick = bricks[brickIndex];
-      if (!boxesTouch(bullet, brick)) {
-        continue;
-      }
-
-      brick.health -= 1;
-      if (brick.health <= 0) {
-        bricks.splice(brickIndex, 1);
-      }
-      invaderBullets.splice(bulletIndex, 1);
-      hitBrick = true;
-      break;
-    }
-    if (hitBrick) {
-      continue;
-    }
-
     if (boxesTouch(bullet, paddle)) {
+      invaderBullets.splice(bulletIndex, 1);
       loseLife();
       return;
     }
@@ -210,6 +209,8 @@ function updateInvaderBullets() {
 
 function loseLife() {
   lives -= 1;
+  combo = 0;
+  comboTimer = 0;
   updateStatus();
   invaderBullets = [];
 
@@ -221,6 +222,34 @@ function loseLife() {
   started = false;
   ballAttached = true;
   positionBall();
+}
+
+function registerTargetHit(points) {
+  combo += 1;
+  comboTimer = COMBO_DURATION;
+  score += points * Math.min(combo, 5);
+  if (score > highScore) {
+    highScore = score;
+    saveHighScore();
+  }
+  updateStatus();
+}
+
+function loadHighScore() {
+  try {
+    return Number(localStorage.getItem("brickBounceHighScore")) || 0;
+  } catch (error) {
+    console.warn("Unable to load the high score.", error);
+    return 0;
+  }
+}
+
+function saveHighScore() {
+  try {
+    localStorage.setItem("brickBounceHighScore", String(highScore));
+  } catch (error) {
+    console.warn("Unable to save the high score.", error);
+  }
 }
 
 function draw() {
@@ -274,6 +303,11 @@ function drawInvaderBullets() {
 function updateStatus() {
   document.getElementById("level").textContent = level;
   document.getElementById("lives").textContent = lives;
+  document.getElementById("score").textContent = score.toLocaleString();
+  document.getElementById("high-score").textContent = highScore.toLocaleString();
+  document.getElementById("combo").textContent = `x${combo}`;
+  document.getElementById("bricks-left").textContent = bricks.length;
+  document.getElementById("invaders-left").textContent = invaders.length;
 }
 
 function drawSquircle(x, y, width, height) {
@@ -318,14 +352,17 @@ function frame(now) {
 }
 
 function resetGame() {
-  bricks = makeBricks();
-  invaders = makeInvaders();
+  bricks = makeBricks(1);
+  invaders = makeInvaders(1);
   invaderBullets = [];
   invaderDirection = 1;
   invaderFireTimer = 0;
   paddle.x = WIDTH / 2 - paddle.width / 2;
   level = 1;
   lives = STARTING_LIVES;
+  score = 0;
+  combo = 0;
+  comboTimer = 0;
   started = false;
   ballAttached = true;
   paused = false;
