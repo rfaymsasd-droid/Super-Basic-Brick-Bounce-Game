@@ -157,11 +157,16 @@ function updatePointerPaddle(event) {
 }
 
 function update() {
-  if (!gameActive || gameOver) return;
+  if (!gameActive) return;
   updateGamepad();
   if (paused) return;
 
+  if (gameOver) {
+    updateTetrominoEffects();
+    return;
+  }
   updateGameEffects();
+  updateTetrominoEffects();
   movePaddle();
   if (ballAttached) {
     positionBall();
@@ -181,6 +186,7 @@ function update() {
 
   updateMechanics();
   moveInvaders();
+  updateTetrominoes();
   for (let index = balls.length - 1; index >= 0; index -= 1) {
     const targetBall = balls[index];
     if (targetBall.caught) continue;
@@ -221,6 +227,7 @@ function advanceBallWithCollisionChecks(targetBall) {
   for (let step = 0; step < steps; step += 1) {
     moveBall(targetBall, 1 / steps);
     bounceOffWalls(targetBall);
+    resolveTetrominoBallCollision(targetBall);
     for (const currentPaddle of getPaddles()) {
       bounceOffPaddle(targetBall, currentPaddle);
       if (targetBall.caught) return;
@@ -503,6 +510,7 @@ function draw() {
     ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
   }
   drawGameBackground();
+  drawTetrominoes();
   ctx.fillStyle = getCustomizationColor("paddle");
   drawPaddle(paddle);
   if (activeMode === "coop") drawPaddle(secondPaddle);
@@ -784,6 +792,7 @@ function resetGame() {
   paddleImpact = 0;
   impactPaddle = paddle;
   gameParticles = [];
+  clearTetrominoes();
   movingTick = 0;
   gravityField = null;
   paddle.width = 72;

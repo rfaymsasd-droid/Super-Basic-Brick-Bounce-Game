@@ -1,4 +1,4 @@
-const CACHE_NAME = "vector-break-shell-v3";
+const CACHE_NAME = "vector-break-shell-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -7,6 +7,7 @@ const APP_SHELL = [
   "./themes.js",
   "./bricks.js",
   "./collisions.js",
+  "./tetrominoes.js",
   "./mechanics.js",
   "./modes.js",
   "./ui.js",

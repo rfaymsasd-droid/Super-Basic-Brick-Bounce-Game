@@ -50,7 +50,7 @@ function loadInterfaceData() {
     achievements: [],
     customization: { ball: "classic", paddle: "classic", theme: "crimson", trail: "comet" },
     customTheme: { ...THEME_PRESETS.crimson, id: "custom", name: "Custom Theme" },
-    settings: { sound: true, sfxVolume: 0.7, music: true, musicVolume: 0.2, reducedMotion: false, effectsIntensity: 0.6, colorblind: false, cameraShake: false, motionBlur: false, animatedGrid: true }
+    settings: { sound: true, sfxVolume: 0.7, music: true, musicVolume: 0.2, reducedMotion: false, effectsIntensity: 0.6, colorblind: false, cameraShake: false, motionBlur: false, animatedGrid: true, tetrisEffects: true }
   };
   try {
     const stored = JSON.parse(localStorage.getItem(UI_STORAGE_KEY) || "{}");
@@ -123,11 +123,16 @@ function initializeInterface() {
     ["camera-shake-setting", "cameraShake"],
     ["motion-blur-setting", "motionBlur"],
     ["grid-setting", "animatedGrid"],
+    ["tetris-effects-setting", "tetrisEffects"],
     ["colorblind-setting", "colorblind"]
   ]) {
     document.getElementById(setting).addEventListener("change", (event) => {
       interfaceData.settings[key] = event.target.checked;
       if (key === "colorblind") document.body.classList.toggle("colorblind-mode", event.target.checked);
+      if ((key === "tetrisEffects" && !event.target.checked) ||
+          (key === "reducedMotion" && event.target.checked)) {
+        clearTetrominoVisualEffects();
+      }
       saveInterfaceData();
       updateMusic();
     });
@@ -148,6 +153,7 @@ function initializeInterface() {
   }
   document.getElementById("motion-setting").addEventListener("change", (event) => {
     interfaceData.settings.reducedMotion = event.target.checked;
+    if (event.target.checked) clearTetrominoVisualEffects();
     applyCustomization();
     saveInterfaceData();
   });
@@ -626,6 +632,7 @@ function applyCustomization() {
   document.getElementById("camera-shake-setting").checked = interfaceData.settings.cameraShake;
   document.getElementById("motion-blur-setting").checked = interfaceData.settings.motionBlur;
   document.getElementById("grid-setting").checked = interfaceData.settings.animatedGrid;
+  document.getElementById("tetris-effects-setting").checked = interfaceData.settings.tetrisEffects;
   document.getElementById("motion-setting").checked = interfaceData.settings.reducedMotion;
   document.getElementById("colorblind-setting").checked = interfaceData.settings.colorblind;
   document.getElementById("effects-volume").value = interfaceData.settings.sfxVolume;
@@ -677,6 +684,7 @@ function renderSettings() {
   document.getElementById("camera-shake-setting").checked = interfaceData.settings.cameraShake;
   document.getElementById("motion-blur-setting").checked = interfaceData.settings.motionBlur;
   document.getElementById("grid-setting").checked = interfaceData.settings.animatedGrid;
+  document.getElementById("tetris-effects-setting").checked = interfaceData.settings.tetrisEffects;
   document.getElementById("motion-setting").checked = interfaceData.settings.reducedMotion;
   document.getElementById("colorblind-setting").checked = interfaceData.settings.colorblind;
   document.getElementById("effects-volume").value = interfaceData.settings.sfxVolume;
