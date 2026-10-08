@@ -50,7 +50,14 @@ function loadInterfaceData() {
     achievements: [],
     customization: { ball: "classic", paddle: "classic", theme: "crimson", trail: "comet" },
     customTheme: { ...THEME_PRESETS.crimson, id: "custom", name: "Custom Theme" },
-    settings: { sound: true, sfxVolume: 0.7, music: true, musicVolume: 0.2, reducedMotion: false, effectsIntensity: 0.6, colorblind: false, cameraShake: false, motionBlur: false, animatedGrid: true, tetrisEffects: true }
+    settings: {
+      sound: true, sfxVolume: 0.7, music: true, musicVolume: 0.2, reducedMotion: false,
+      effectsIntensity: 0.6, colorblind: false, cameraShake: false, motionBlur: false,
+      animatedGrid: true, tetrisEffects: true, obstacleDensity: "normal",
+      obstacleMinSize: 20, obstacleMaxSize: 50, obstacleSpeed: 1,
+      obstacleVisualIntensity: 0.6, obstacleExplosionParticles: true,
+      obstacleShapeVariety: true
+    }
   };
   try {
     const stored = JSON.parse(localStorage.getItem(UI_STORAGE_KEY) || "{}");
@@ -67,13 +74,34 @@ function loadInterfaceData() {
           : defaults.customization.theme
       },
       customTheme: normalizeCustomTheme(stored.customTheme, defaults.customTheme),
-      settings: { ...defaults.settings, ...stored.settings },
+      settings: normalizeObstacleSettings({ ...defaults.settings, ...stored.settings }),
       achievements: Array.isArray(stored.achievements) ? stored.achievements : []
     };
   } catch (error) {
     console.warn("Unable to load interface progress.", error);
     return defaults;
   }
+}
+
+function normalizeObstacleSettings(settings) {
+  const densities = ["off", "low", "normal", "high", "chaos"];
+  const clamp = (value, minimum, maximum, fallback) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? Math.max(minimum, Math.min(maximum, numeric)) : fallback;
+  };
+  const minimum = Math.round(clamp(settings.obstacleMinSize, 20, 65, 20) / 5) * 5;
+  const maximum = Math.max(minimum, Math.round(clamp(settings.obstacleMaxSize, 20, 65, 50) / 5) * 5);
+  return {
+    ...settings,
+    obstacleDensity: densities.includes(settings.obstacleDensity) ? settings.obstacleDensity : "normal",
+    obstacleMinSize: minimum,
+    obstacleMaxSize: maximum,
+    obstacleSpeed: clamp(settings.obstacleSpeed, 0.5, 2, 1),
+    obstacleVisualIntensity: clamp(settings.obstacleVisualIntensity, 0, 1, 0.6),
+    obstacleExplosionParticles: settings.obstacleExplosionParticles !== false,
+    obstacleShapeVariety: settings.obstacleShapeVariety !== false,
+    tetrisEffects: settings.tetrisEffects !== false
+  };
 }
 
 function normalizeCustomTheme(candidate, fallback = { ...THEME_PRESETS.crimson, id: "custom", name: "Custom Theme" }) {
@@ -123,18 +151,54 @@ function initializeInterface() {
     ["camera-shake-setting", "cameraShake"],
     ["motion-blur-setting", "motionBlur"],
     ["grid-setting", "animatedGrid"],
-    ["tetris-effects-setting", "tetrisEffects"],
     ["colorblind-setting", "colorblind"]
   ]) {
     document.getElementById(setting).addEventListener("change", (event) => {
       interfaceData.settings[key] = event.target.checked;
       if (key === "colorblind") document.body.classList.toggle("colorblind-mode", event.target.checked);
-      if ((key === "tetrisEffects" && !event.target.checked) ||
-          (key === "reducedMotion" && event.target.checked)) {
-        clearTetrominoVisualEffects();
-      }
       saveInterfaceData();
       updateMusic();
+    });
+  }
+  document.getElementById("obstacle-density-setting").addEventListener("change", (event) => {
+    interfaceData.settings.obstacleDensity = event.target.value;
+    clearTetrominoes();
+    saveInterfaceData();
+  });
+  for (const [id, key, outputId] of [
+    ["obstacle-min-size", "obstacleMinSize", "obstacle-min-size-value"],
+    ["obstacle-max-size", "obstacleMaxSize", "obstacle-max-size-value"],
+    ["obstacle-speed", "obstacleSpeed", "obstacle-speed-value"],
+    ["obstacle-visual-intensity", "obstacleVisualIntensity", "obstacle-visual-intensity-value"]
+  ]) {
+    const input = document.getElementById(id);
+    input.addEventListener("input", () => {
+      interfaceData.settings[key] = Number(input.value);
+      if (key === "obstacleMinSize" && interfaceData.settings.obstacleMinSize > interfaceData.settings.obstacleMaxSize) {
+        interfaceData.settings.obstacleMaxSize = interfaceData.settings.obstacleMinSize;
+        document.getElementById("obstacle-max-size").value = interfaceData.settings.obstacleMaxSize;
+      } else if (key === "obstacleMaxSize" && interfaceData.settings.obstacleMaxSize < interfaceData.settings.obstacleMinSize) {
+        interfaceData.settings.obstacleMinSize = interfaceData.settings.obstacleMaxSize;
+        document.getElementById("obstacle-min-size").value = interfaceData.settings.obstacleMinSize;
+      }
+      document.getElementById("obstacle-min-size-value").textContent = `${interfaceData.settings.obstacleMinSize} px`;
+      document.getElementById("obstacle-max-size-value").textContent = `${interfaceData.settings.obstacleMaxSize} px`;
+      const value = key === "obstacleSpeed"
+        ? `${Number(input.value).toFixed(1)}×`
+        : `${Math.round(Number(input.value) * 100)}%`;
+      document.getElementById(outputId).textContent = value;
+      saveInterfaceData();
+    });
+  }
+  for (const [id, key] of [
+    ["obstacle-explosions-setting", "obstacleExplosionParticles"],
+    ["obstacle-variety-setting", "obstacleShapeVariety"],
+    ["tetris-effects-setting", "tetrisEffects"]
+  ]) {
+    document.getElementById(id).addEventListener("change", (event) => {
+      interfaceData.settings[key] = event.target.checked;
+      if (!event.target.checked) clearTetrominoVisualEffects();
+      saveInterfaceData();
     });
   }
   for (const [id, key, outputId] of [
@@ -633,6 +697,17 @@ function applyCustomization() {
   document.getElementById("motion-blur-setting").checked = interfaceData.settings.motionBlur;
   document.getElementById("grid-setting").checked = interfaceData.settings.animatedGrid;
   document.getElementById("tetris-effects-setting").checked = interfaceData.settings.tetrisEffects;
+  document.getElementById("obstacle-density-setting").value = interfaceData.settings.obstacleDensity;
+  document.getElementById("obstacle-min-size").value = interfaceData.settings.obstacleMinSize;
+  document.getElementById("obstacle-max-size").value = interfaceData.settings.obstacleMaxSize;
+  document.getElementById("obstacle-speed").value = interfaceData.settings.obstacleSpeed;
+  document.getElementById("obstacle-visual-intensity").value = interfaceData.settings.obstacleVisualIntensity;
+  document.getElementById("obstacle-explosions-setting").checked = interfaceData.settings.obstacleExplosionParticles;
+  document.getElementById("obstacle-variety-setting").checked = interfaceData.settings.obstacleShapeVariety;
+  document.getElementById("obstacle-min-size-value").textContent = `${interfaceData.settings.obstacleMinSize} px`;
+  document.getElementById("obstacle-max-size-value").textContent = `${interfaceData.settings.obstacleMaxSize} px`;
+  document.getElementById("obstacle-speed-value").textContent = `${interfaceData.settings.obstacleSpeed.toFixed(1)}×`;
+  document.getElementById("obstacle-visual-intensity-value").textContent = `${Math.round(interfaceData.settings.obstacleVisualIntensity * 100)}%`;
   document.getElementById("motion-setting").checked = interfaceData.settings.reducedMotion;
   document.getElementById("colorblind-setting").checked = interfaceData.settings.colorblind;
   document.getElementById("effects-volume").value = interfaceData.settings.sfxVolume;
@@ -685,6 +760,13 @@ function renderSettings() {
   document.getElementById("motion-blur-setting").checked = interfaceData.settings.motionBlur;
   document.getElementById("grid-setting").checked = interfaceData.settings.animatedGrid;
   document.getElementById("tetris-effects-setting").checked = interfaceData.settings.tetrisEffects;
+  document.getElementById("obstacle-density-setting").value = interfaceData.settings.obstacleDensity;
+  document.getElementById("obstacle-min-size").value = interfaceData.settings.obstacleMinSize;
+  document.getElementById("obstacle-max-size").value = interfaceData.settings.obstacleMaxSize;
+  document.getElementById("obstacle-speed").value = interfaceData.settings.obstacleSpeed;
+  document.getElementById("obstacle-visual-intensity").value = interfaceData.settings.obstacleVisualIntensity;
+  document.getElementById("obstacle-explosions-setting").checked = interfaceData.settings.obstacleExplosionParticles;
+  document.getElementById("obstacle-variety-setting").checked = interfaceData.settings.obstacleShapeVariety;
   document.getElementById("motion-setting").checked = interfaceData.settings.reducedMotion;
   document.getElementById("colorblind-setting").checked = interfaceData.settings.colorblind;
   document.getElementById("effects-volume").value = interfaceData.settings.sfxVolume;
@@ -695,6 +777,10 @@ function renderSettings() {
     document.getElementById(outputId).value = value;
     document.getElementById(outputId).textContent = value;
   }
+  document.getElementById("obstacle-min-size-value").textContent = `${interfaceData.settings.obstacleMinSize} px`;
+  document.getElementById("obstacle-max-size-value").textContent = `${interfaceData.settings.obstacleMaxSize} px`;
+  document.getElementById("obstacle-speed-value").textContent = `${interfaceData.settings.obstacleSpeed.toFixed(1)}×`;
+  document.getElementById("obstacle-visual-intensity-value").textContent = `${Math.round(interfaceData.settings.obstacleVisualIntensity * 100)}%`;
 }
 
 function handlePanelClick(event) {

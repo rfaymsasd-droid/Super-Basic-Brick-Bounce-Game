@@ -50,7 +50,8 @@ The HUD tracks score, personal best, combo, lives, level, remaining targets, and
 - Ten brick types, seven enemy types, ten collectible power-ups, locally saved achievements and statistics.
 - Four complete palettes plus a persistent custom color editor, contrast validation, and live animated theme preview.
 - Responsive pointer/touch input, keyboard and standard gamepad controls, fixed-step physics, and sub-stepped fast-ball collision checks.
-- Falling four-square tetromino obstacles with moving-surface ball bounces, level-scaled difficulty, and optional cosmetic-only impact effects.
+- Falling connected polyomino obstacles with moving-surface ball bounces, level-scaled difficulty, and optional cosmetic-only impact effects.
+- Procedurally generated connected obstacle shapes, configurable Off/Low/Normal/High/Chaos density, size and speed controls, and separate glow/particle preferences.
 - Colorblind-friendly target markings, reduced motion, adjustable effects and audio, and automatic pause when the tab loses focus.
 - Optional installable PWA shell. Crimson Arcade uses nearly black scenery, white interface text, red highlights and glow, color-coded bricks, and distinctive special-target/power-up colors.
 

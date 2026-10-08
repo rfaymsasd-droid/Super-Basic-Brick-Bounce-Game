@@ -108,7 +108,25 @@
             <label><span>Camera shake</span><input id="camera-shake-setting" type="checkbox"></label>
             <label><span>Motion blur</span><input id="motion-blur-setting" type="checkbox"></label>
             <label><span>Animated grid</span><input id="grid-setting" type="checkbox" checked></label>
-            <label><span>Tetris obstacle effects</span><input id="tetris-effects-setting" type="checkbox" checked></label>
+            <section class="obstacle-settings" aria-labelledby="obstacle-settings-title">
+              <h3 id="obstacle-settings-title">Falling Obstacles</h3>
+              <label><span>Obstacle density</span>
+                <select id="obstacle-density-setting">
+                  <option value="off">Off</option>
+                  <option value="low">Low · 5–8</option>
+                  <option value="normal">Normal · 8–15</option>
+                  <option value="high">High · 15–25</option>
+                  <option value="chaos">Chaos · 25–35</option>
+                </select>
+              </label>
+              <label class="range-setting"><span>Minimum square size <output id="obstacle-min-size-value" for="obstacle-min-size">20 px</output></span><input id="obstacle-min-size" type="range" min="20" max="65" step="5" value="20"></label>
+              <label class="range-setting"><span>Maximum square size <output id="obstacle-max-size-value" for="obstacle-max-size">50 px</output></span><input id="obstacle-max-size" type="range" min="20" max="65" step="5" value="50"></label>
+              <label class="range-setting"><span>Falling speed <output id="obstacle-speed-value" for="obstacle-speed">1.0×</output></span><input id="obstacle-speed" type="range" min="0.5" max="2" step="0.1" value="1"></label>
+              <label class="range-setting"><span>Obstacle visual intensity <output id="obstacle-visual-intensity-value" for="obstacle-visual-intensity">60%</output></span><input id="obstacle-visual-intensity" type="range" min="0" max="1" step="0.1" value="0.6"></label>
+              <label><span>Obstacle glow and trails</span><input id="tetris-effects-setting" type="checkbox" checked></label>
+              <label><span>Explosion particles</span><input id="obstacle-explosions-setting" type="checkbox" checked></label>
+              <label><span>Expanded shape variety</span><input id="obstacle-variety-setting" type="checkbox" checked></label>
+            </section>
             <button id="fullscreen-button" type="button">Full screen</button>
           </div>
         </section>

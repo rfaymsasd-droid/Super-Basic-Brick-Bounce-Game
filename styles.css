@@ -346,6 +346,60 @@ select {
   gap: 18px;
 }
 
+.obstacle-settings {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid #ffffff20;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 75%, transparent);
+}
+
+.obstacle-settings h3 {
+  margin: 0;
+  color: var(--accent);
+  font-size: 15px;
+  letter-spacing: .04em;
+}
+
+.obstacle-settings label {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.obstacle-settings label > span {
+  flex: 1;
+}
+
+.obstacle-settings select {
+  max-width: 180px;
+  padding: 8px 10px;
+  border: 1px solid #ffffff26;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.obstacle-settings .range-setting {
+  gap: 4px;
+}
+
+.obstacle-settings .range-setting span {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.obstacle-settings input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.obstacle-settings output {
+  color: var(--accent-secondary);
+}
+
 .settings-list label {
   flex-direction: row;
   align-items: center;
