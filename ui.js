@@ -142,7 +142,7 @@ function initializeInterface() {
   document.getElementById("game-fullscreen-button").addEventListener("click", toggleFullscreen);
   document.getElementById("pause-button").addEventListener("click", pauseGame);
   document.getElementById("launch-button").addEventListener("click", () => {
-    if (!gameActive || paused || gameOver) return;
+    if (!gameActive || paused || gameOver || galacticBossDefeatTimer > 0) return;
     unlockAudio();
     if (!started || balls.some((targetBall) => targetBall.caught)) {
       recordLaunch();

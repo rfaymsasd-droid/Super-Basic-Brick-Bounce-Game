@@ -105,7 +105,7 @@ document.addEventListener("keydown", function (event) {
   if (event.code === "Space") {
     if (event.target !== canvas && event.target !== document.body) return;
     event.preventDefault();
-    if (!event.repeat && !paused && !gameOver && gameActive) {
+    if (!event.repeat && !paused && !gameOver && gameActive && galacticBossDefeatTimer === 0) {
       recordLaunch();
       started = true;
       launchBall();
@@ -113,7 +113,7 @@ document.addEventListener("keydown", function (event) {
   } else if (key === "r" && !event.repeat && (gameActive || gameOver)) {
     resetGame();
     beginGame(false);
-  } else if (key === "e" && !event.repeat && gameActive) {
+  } else if (key === "e" && !event.repeat && gameActive && galacticBossDefeatTimer === 0) {
     activateSpecialAbility();
   } else if ((key === "p" || key === "escape") && !event.repeat && !gameOver && gameActive) {
     if (paused) resumeGame();
@@ -172,6 +172,12 @@ function update() {
     updateTetrominoEffects();
     return;
   }
+  if (galacticBossDefeatTimer > 0) {
+    updateGameEffects();
+    updateTetrominoEffects();
+    if (updateGalacticBossEffects()) advanceModeLevel();
+    return;
+  }
   updateGameEffects();
   updateTetrominoEffects();
   movePaddle();
@@ -197,6 +203,7 @@ function update() {
   for (let index = balls.length - 1; index >= 0; index -= 1) {
     const targetBall = balls[index];
     if (targetBall.caught) continue;
+    applyGalacticBeamForce(targetBall);
     advanceBallWithCollisionChecks(targetBall);
     if (targetBall.caught) continue;
     if (targetBall.y > HEIGHT) {
@@ -222,7 +229,7 @@ function update() {
     }
   }
 
-  if (!gameOver && started && areModeObjectivesComplete()) advanceModeLevel();
+  if (!gameOver && started && galacticBossDefeatTimer === 0 && areModeObjectivesComplete()) advanceModeLevel();
 
   updateStatus();
 }
@@ -263,7 +270,7 @@ function updateGamepad() {
     const abilityPressed = Boolean(gamepad.buttons[1]?.pressed);
     const pausePressed = Boolean(gamepad.buttons[9]?.pressed);
     const previous = gamepadButtonState.get(gamepad.index) || { launch: false, ability: false, pause: false };
-    if (launchPressed && !previous.launch && gameActive && !paused && !gameOver) {
+    if (launchPressed && !previous.launch && gameActive && !paused && !gameOver && galacticBossDefeatTimer === 0) {
       recordLaunch();
       started = true;
       launchBall();
@@ -272,7 +279,7 @@ function updateGamepad() {
       if (paused) resumeGame();
       else pauseGame();
     }
-    if (abilityPressed && !previous.ability) activateSpecialAbility();
+    if (abilityPressed && !previous.ability && galacticBossDefeatTimer === 0) activateSpecialAbility();
     gamepadButtonState.set(gamepad.index, { launch: launchPressed, ability: abilityPressed, pause: pausePressed });
   }
 }
@@ -355,6 +362,11 @@ function moveInvaders() {
   }
 
   if (activeMode === "classic" || activeMode === "zen") return;
+  const galacticCommander = invaders.find((invader) => invader.variant === "galactic-commander");
+  if (galacticCommander) {
+    updateGalacticCommander(galacticCommander);
+    return;
+  }
   const speed = 0.9 * (activeEffects.slow ? 0.55 : 1);
   const leftEdge = Math.min(...invaders.map((invader) => invader.x)) + invaderDirection * speed;
   const rightEdge = Math.max(...invaders.map((invader) => invader.x + invader.width)) + invaderDirection * speed;
@@ -600,6 +612,7 @@ function draw() {
   drawBricks();
   drawInvaders();
   drawEnemyDetails();
+  drawGalacticBossEffects();
   drawGameParticles();
   drawInvaderBullets();
   drawPowerUps();
@@ -649,6 +662,10 @@ function drawPaddle(targetPaddle) {
 
 function drawInvaders() {
   for (const invader of invaders) {
+    if (invader.variant === "galactic-commander") {
+      drawGalacticCommander(invader);
+      continue;
+    }
     const { x, y, width, height } = invader;
     const colors = {
       standard: gameTheme.enemy,
@@ -862,6 +879,7 @@ function resetGame() {
   shieldCharges = 0;
   laserCooldown = 0;
   shockwaveTimer = 0;
+  resetGalacticBossState();
   cameraShake = 0;
   paddleImpact = 0;
   impactPaddle = paddle;

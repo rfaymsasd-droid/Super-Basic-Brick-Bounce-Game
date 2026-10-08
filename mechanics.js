@@ -243,6 +243,14 @@ function damageInvader(index, targetBall) {
   cameraShake = Math.max(cameraShake, destroyed.type === "boss" ? 5 : 2.2);
   registerTargetHit(destroyed.type === "boss" ? 3000 : destroyed.type === "tank" ? 100 : 50);
   if (destroyed.type === "boss") {
+    if (destroyed.variant === "galactic-commander") {
+      destroyed.beamState = "idle";
+      destroyed.beamTimer = 0;
+      invaderBullets = [];
+      spawnGalacticBossFragments(destroyed);
+      registerBonusPoints(5000);
+      playGameSound("destroy");
+    }
     if (activeMode === "campaign" || activeMode === "boss_rush") lives += 1;
   }
   dropPowerUp(destroyed.x + destroyed.width / 2, destroyed.y, destroyed.type === "boss" ? 1 : 0.18);
@@ -334,7 +342,7 @@ function chargeSpecialAbility(amount) {
 }
 
 function activateSpecialAbility() {
-  if (!gameActive || !started || paused || gameOver) return false;
+  if (!gameActive || !started || paused || gameOver || galacticBossDefeatTimer > 0) return false;
   if (specialAbilityRemaining > 0) return false;
   const ability = SPECIAL_ABILITIES[equippedSpecialAbility];
   if (specialAbilityEnergy < ability.cost) return false;
@@ -367,7 +375,8 @@ function updateSpecialAbilityStatus() {
   button.textContent = specialAbilityRemaining > 0
     ? `${ability.name} · ${Math.ceil(specialAbilityRemaining / 60)}s`
     : `${ability.name} · ${Math.floor(specialAbilityEnergy)}/${ability.cost}`;
-  button.disabled = !ready || specialAbilityRemaining > 0 || !gameActive || !started || paused || gameOver;
+  button.disabled = !ready || specialAbilityRemaining > 0 || !gameActive || !started || paused || gameOver ||
+    galacticBossDefeatTimer > 0;
   document.getElementById("special-ability-select").disabled = started;
   status.textContent = `Special energy · ${Math.floor(specialAbilityEnergy)}/100`;
   bar.style.width = `${specialAbilityEnergy}%`;
@@ -635,6 +644,7 @@ function drawPowerUps() {
 
 function drawEnemyDetails() {
   for (const invader of invaders) {
+    if (invader.variant === "galactic-commander") continue;
     const colors = {
       standard: gameTheme.enemy,
       scout: gameTheme.accentSecondary,

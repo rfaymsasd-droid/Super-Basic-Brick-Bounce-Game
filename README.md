@@ -41,7 +41,7 @@ The ten-level Crimson Sector introduces mechanics in stages instead of relying o
 7. Regenerating bricks and phantoms.
 8. Portal bricks and shield generators.
 9. Chain reactions and a mixed elite formation.
-10. Armored and explosive targets alongside the three-phase Crimson boss. Defeating it unlocks Endless.
+10. Armored and explosive targets alongside the three-phase Galactic Commander. Defeating it unlocks Endless.
 
 The HUD tracks score, personal best, combo, lives, level, remaining targets, objective progress, and special ability energy. Paddle impact position aims the ball; centered sweet-spot hits award bonus points and energy, and destroying bricks or invaders also charges the meter. Choose Pulse, Overdrive, or Time Warp before launching. Ricocheting off three distinct falling shapes within ten seconds, without a paddle hit between them, earns a Tetris trick-shot bonus. Enemy projectiles threaten the paddle but cannot damage bricks.
 
@@ -54,6 +54,7 @@ The HUD tracks score, personal best, combo, lives, level, remaining targets, obj
 - Responsive pointer/touch input, keyboard and standard gamepad controls, fixed-step physics, and sub-stepped fast-ball collision checks.
 - Falling connected polyomino obstacles with moving-surface ball bounces, level-scaled difficulty, and optional cosmetic-only impact effects.
 - Perfect paddle hits and Tetris trick shots reward precision with bonus score and special energy; charge and activate Pulse, Overdrive, or Time Warp during modern gameplay.
+- The Campaign finale features the Galactic Commander: a pixel-art boss with a phase-based projectile attack and a warning-led tractor beam that gently pulls balls toward its center. Its defeat awards a bonus and plays a non-colliding pixel-fragment animation. The commander also appears on alternating Boss Rush rounds and every 20th Endless level.
 - Procedurally generated connected obstacle shapes, configurable Off/Low/Normal/High/Chaos density (3–5 active at Low and 5–8 at Normal), size and speed controls, and separate glow/particle preferences.
 - Colorblind-friendly target markings, reduced motion, adjustable effects and audio, and automatic pause when the tab loses focus.
 - Optional installable PWA shell. Crimson Arcade uses nearly black scenery, white interface text, red highlights and glow, color-coded bricks, and distinctive special-target/power-up colors.
