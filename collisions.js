@@ -7,77 +7,73 @@ function boxesTouch(a, b) {
   );
 }
 
-function bounceOffWalls() {
-  if (ball.x < 0) {
-    ball.x = 0;
-    ball.vx = -ball.vx;
+function bounceOffWalls(targetBall = ball) {
+  if (targetBall.x < 0) {
+    targetBall.x = 0;
+    targetBall.vx = -targetBall.vx;
   }
-  if (ball.x + ball.width > WIDTH) {
-    ball.x = WIDTH - ball.width;
-    ball.vx = -ball.vx;
+  if (targetBall.x + targetBall.width > WIDTH) {
+    targetBall.x = WIDTH - targetBall.width;
+    targetBall.vx = -targetBall.vx;
   }
-  if (ball.y < 0) {
-    ball.y = 0;
-    ball.vy = -ball.vy;
+  if (targetBall.y < 0) {
+    targetBall.y = 0;
+    targetBall.vy = -targetBall.vy;
   }
 }
 
-function bounceOffPaddle() {
-  if (boxesTouch(ball, paddle) && ball.vy > 0) {
-    ball.y = paddle.y - ball.height;
-    const impactOffset = (ball.x + ball.width / 2 - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+function bounceOffPaddle(targetBall = ball) {
+  if (boxesTouch(targetBall, paddle) && targetBall.vy > 0) {
+    targetBall.y = paddle.y - targetBall.height;
+    if (catchBall(targetBall)) return;
+    const impactOffset = (targetBall.x + targetBall.width / 2 - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
     const angle = Math.max(-1, Math.min(1, impactOffset)) * Math.PI / 3;
     const speed = BALL_SPEED + Math.min((level - 1) * 0.2, 1.5);
-    ball.vx = Math.sin(angle) * speed;
-    ball.vy = -Math.cos(angle) * speed;
+    targetBall.vx = Math.sin(angle) * speed;
+    targetBall.vy = -Math.cos(angle) * speed;
   }
 }
 
-function bounceOffBricks() {
+function bounceOffBricks(targetBall = ball) {
   for (let index = bricks.length - 1; index >= 0; index -= 1) {
     const brick = bricks[index];
-    if (!boxesTouch(ball, brick)) {
+    if (!boxesTouch(targetBall, brick)) {
       continue;
     }
 
-    const overlapX = Math.min(ball.x + ball.width, brick.x + brick.width) - Math.max(ball.x, brick.x);
-    const overlapY = Math.min(ball.y + ball.height, brick.y + brick.height) - Math.max(ball.y, brick.y);
+    const overlapX = Math.min(targetBall.x + targetBall.width, brick.x + brick.width) - Math.max(targetBall.x, brick.x);
+    const overlapY = Math.min(targetBall.y + targetBall.height, brick.y + brick.height) - Math.max(targetBall.y, brick.y);
 
-    if (overlapX < overlapY) {
-      ball.vx = -ball.vx;
-      if (ball.x < brick.x) {
-        ball.x = brick.x - ball.width;
+    if (!targetBall.piercing && overlapX < overlapY) {
+      targetBall.vx = -targetBall.vx;
+      if (targetBall.x < brick.x) {
+        targetBall.x = brick.x - targetBall.width;
       } else {
-        ball.x = brick.x + brick.width;
+        targetBall.x = brick.x + brick.width;
       }
-    } else {
-      ball.vy = -ball.vy;
-      if (ball.y < brick.y) {
-        ball.y = brick.y - ball.height;
+    } else if (!targetBall.piercing) {
+      targetBall.vy = -targetBall.vy;
+      if (targetBall.y < brick.y) {
+        targetBall.y = brick.y - targetBall.height;
       } else {
-        ball.y = brick.y + brick.height;
+        targetBall.y = brick.y + brick.height;
       }
     }
 
-    brick.health -= 1;
-    registerTargetHit(10);
-    if (brick.health <= 0) {
-      bricks.splice(index, 1);
-    }
+    damageBrick(index, targetBall);
     break;
   }
 }
 
-function bounceOffInvaders() {
+function bounceOffInvaders(targetBall = ball) {
   for (let index = invaders.length - 1; index >= 0; index -= 1) {
     const invader = invaders[index];
-    if (!boxesTouch(ball, invader)) {
+    if (invader.intangible || !boxesTouch(targetBall, invader)) {
       continue;
     }
 
-    ball.vy = -ball.vy;
-    invaders.splice(index, 1);
-    registerTargetHit(50);
+    targetBall.vy = -targetBall.vy;
+    damageInvader(index, targetBall);
     break;
   }
 }

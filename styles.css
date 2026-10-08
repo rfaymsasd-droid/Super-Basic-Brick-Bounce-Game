@@ -23,7 +23,7 @@ main {
 .game-status {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-between;
+  justify-content: center;
   gap: 8px 16px;
   padding: 0 4px 10px;
   font-size: 16px;
@@ -31,6 +31,11 @@ main {
 
 .game-status strong {
   padding-left: 4px;
+}
+
+#powerup-status {
+  min-height: 1.5em;
+  color: #65ffcc;
 }
 
 canvas {
