@@ -1,9 +1,9 @@
 const TETROMINO_COLORS = ["accent", "accentSecondary", "accentTertiary", "brick", "enemy", "projectile", "paddle"];
 const OBSTACLE_DENSITIES = {
-  low: { min: 5, max: 8, interval: 14, burst: 2 },
-  normal: { min: 8, max: 15, interval: 10, burst: 3 },
-  high: { min: 15, max: 25, interval: 7, burst: 4 },
-  chaos: { min: 25, max: 35, interval: 5, burst: 5 }
+  low: { min: 3, max: 5, interval: 24, burst: 1 },
+  normal: { min: 5, max: 8, interval: 17, burst: 2 },
+  high: { min: 8, max: 12, interval: 12, burst: 2 },
+  chaos: { min: 12, max: 20, interval: 8, burst: 3 }
 };
 const CLASSIC_OBSTACLE_SHAPES = [
   { name: "I", cells: [[0, 0], [1, 0], [2, 0], [3, 0]] },
@@ -292,7 +292,7 @@ function updateTetrominoEffects() {
 
 function updateTetrominoes() {
   const settings = getObstacleSettings();
-  if (interfaceData.settings.obstacleDensity === "off") {
+  if (interfaceData.customization.theme === "legacy" || interfaceData.settings.obstacleDensity === "off") {
     fallingTetrominoes.length = 0;
     tetrominoTargetActive = 0;
     tetrominoSpawnTimer = 0;

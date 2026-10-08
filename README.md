@@ -49,9 +49,10 @@ The HUD tracks score, personal best, combo, lives, level, remaining targets, and
 - Classic Arcade, Endless (unlocked by the campaign), Time Attack, Boss Rush, Survival, Daily Challenge, Zen, and Local Co-op.
 - Ten brick types, seven enemy types, ten collectible power-ups, locally saved achievements and statistics.
 - Four complete palettes plus a persistent custom color editor, contrast validation, and live animated theme preview.
+- An **Original (Legacy)** theme launches the authentic pre-modernization game in an isolated frame. Its original HTML, CSS, and JavaScript are preserved from upstream commit [`876816664f75c670a1542e2cd37df887c5d8ca30`](https://github.com/iherrick-mps/Super-Basic-Brick-Bounce-Game/commit/876816664f75c670a1542e2cd37df887c5d8ca30) under `legacy/`.
 - Responsive pointer/touch input, keyboard and standard gamepad controls, fixed-step physics, and sub-stepped fast-ball collision checks.
 - Falling connected polyomino obstacles with moving-surface ball bounces, level-scaled difficulty, and optional cosmetic-only impact effects.
-- Procedurally generated connected obstacle shapes, configurable Off/Low/Normal/High/Chaos density, size and speed controls, and separate glow/particle preferences.
+- Procedurally generated connected obstacle shapes, configurable Off/Low/Normal/High/Chaos density (3–5 active at Low and 5–8 at Normal), size and speed controls, and separate glow/particle preferences.
 - Colorblind-friendly target markings, reduced motion, adjustable effects and audio, and automatic pause when the tab loses focus.
 - Optional installable PWA shell. Crimson Arcade uses nearly black scenery, white interface text, red highlights and glow, color-coded bricks, and distinctive special-target/power-up colors.
 

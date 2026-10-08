@@ -346,6 +346,45 @@ select {
   gap: 18px;
 }
 
+#legacy-experience[hidden] {
+  display: none !important;
+}
+
+#legacy-experience {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  overflow: hidden;
+  background: #000;
+}
+
+body.legacy-experience-mode #menu-background {
+  display: none;
+}
+
+#legacy-game-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+#return-modern-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1;
+  border-color: #ffffff66;
+  background: #000;
+  color: #fff;
+  font-family: "Times New Roman", Times, serif;
+}
+
+#return-modern-button:hover {
+  border-color: #fff;
+  background: #161616;
+}
+
 .obstacle-settings {
   display: grid;
   min-width: 0;
@@ -782,6 +821,20 @@ body.reduced-motion *::after {
   border-radius: 8px;
   background: linear-gradient(140deg, var(--theme-background), var(--theme-surface));
   transition: background 240ms ease;
+}
+
+.classic-label {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 1;
+  padding: 3px 6px;
+  border: 1px solid #fff;
+  border-radius: 4px;
+  background: #000;
+  color: #fff;
+  font: 700 8px/1.2 ui-monospace, monospace;
+  letter-spacing: .08em;
 }
 
 .mini-score {

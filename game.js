@@ -743,6 +743,12 @@ let lastTime = 0;
 let leftover = 0;
 
 function frame(now) {
+  if (interfaceData.customization.theme === "legacy") {
+    lastTime = now;
+    leftover = 0;
+    requestAnimationFrame(frame);
+    return;
+  }
   leftover = leftover + (now - lastTime);
   lastTime = now;
 

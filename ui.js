@@ -48,12 +48,12 @@ function loadInterfaceData() {
     save: { mode: "campaign", level: 1, score: 0 },
     stats: { gamesPlayed: 0, bricksDestroyed: 0, targetsHit: 0, launches: 0, misses: 0, highestLevel: 1, bestScore: 0, campaignComplete: false },
     achievements: [],
-    customization: { ball: "classic", paddle: "classic", theme: "crimson", trail: "comet" },
+    customization: { ball: "classic", paddle: "classic", theme: "crimson", modernTheme: "crimson", trail: "comet" },
     customTheme: { ...THEME_PRESETS.crimson, id: "custom", name: "Custom Theme" },
     settings: {
       sound: true, sfxVolume: 0.7, music: true, musicVolume: 0.2, reducedMotion: false,
       effectsIntensity: 0.6, colorblind: false, cameraShake: false, motionBlur: false,
-      animatedGrid: true, tetrisEffects: true, obstacleDensity: "normal",
+      animatedGrid: true, tetrisEffects: true, obstacleDensity: "low",
       obstacleMinSize: 20, obstacleMaxSize: 50, obstacleSpeed: 1,
       obstacleVisualIntensity: 0.6, obstacleExplosionParticles: true,
       obstacleShapeVariety: true
@@ -71,7 +71,11 @@ function loadInterfaceData() {
         ...stored.customization,
         theme: [...Object.keys(THEME_PRESETS), "custom"].includes(stored.customization?.theme)
           ? stored.customization.theme
-          : defaults.customization.theme
+          : defaults.customization.theme,
+        modernTheme: [...Object.keys(THEME_PRESETS).filter((theme) => theme !== "legacy"), "custom"]
+          .includes(stored.customization?.modernTheme)
+          ? stored.customization.modernTheme
+          : defaults.customization.modernTheme
       },
       customTheme: normalizeCustomTheme(stored.customTheme, defaults.customTheme),
       settings: normalizeObstacleSettings({ ...defaults.settings, ...stored.settings }),
@@ -93,7 +97,7 @@ function normalizeObstacleSettings(settings) {
   const maximum = Math.max(minimum, Math.round(clamp(settings.obstacleMaxSize, 20, 65, 50) / 5) * 5);
   return {
     ...settings,
-    obstacleDensity: densities.includes(settings.obstacleDensity) ? settings.obstacleDensity : "normal",
+    obstacleDensity: densities.includes(settings.obstacleDensity) ? settings.obstacleDensity : "low",
     obstacleMinSize: minimum,
     obstacleMaxSize: maximum,
     obstacleSpeed: clamp(settings.obstacleSpeed, 0.5, 2, 1),
@@ -130,6 +134,7 @@ function initializeInterface() {
   document.getElementById("level-complete-panel").addEventListener("click", handleResultClick);
   document.getElementById("pause-panel").addEventListener("click", handlePauseClick);
   document.getElementById("fullscreen-button").addEventListener("click", toggleFullscreen);
+  document.getElementById("return-modern-button").addEventListener("click", returnToModernExperience);
   document.getElementById("settings-themes-button").addEventListener("click", () => openThemes("settings-screen"));
   document.getElementById("game-fullscreen-button").addEventListener("click", toggleFullscreen);
   document.getElementById("pause-button").addEventListener("click", pauseGame);
@@ -240,6 +245,7 @@ function initializeInterface() {
     window.navigator.serviceWorker.register("./service-worker.js")
       .catch((error) => console.error("Unable to register the offline app shell.", error));
   }
+  if (interfaceData.customization.theme === "legacy") showLegacyExperience();
 }
 
 function buildThemeInterface() {
@@ -256,7 +262,8 @@ function buildThemeInterface() {
     card.className = "theme-card";
     card.dataset.theme = theme.id;
     card.setAttribute("aria-pressed", String(interfaceData.customization.theme === theme.id));
-    card.innerHTML = `<span class="theme-card-preview" aria-hidden="true"><span class="mini-score">SCORE 01240</span><span class="mini-bricks"><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mini-enemy">◆ ◆ ◆</span><span class="mini-ball"></span><span class="mini-paddle"></span></span><span class="theme-card-copy"><strong>${theme.name}</strong><span>${theme.description}</span></span><span class="theme-check" aria-hidden="true">✓</span>`;
+    card.classList.toggle("legacy-theme-card", theme.id === "legacy");
+    card.innerHTML = `<span class="theme-card-preview" aria-hidden="true"><span class="mini-score">SCORE 01240</span><span class="mini-bricks"><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mini-enemy">◆ ◆ ◆</span><span class="mini-ball"></span><span class="mini-paddle"></span></span>${theme.id === "legacy" ? '<span class="classic-label">CLASSIC</span>' : ""}<span class="theme-card-copy"><strong>${theme.name}</strong><span>${theme.description}</span></span><span class="theme-check" aria-hidden="true">✓</span>`;
     styleThemeCard(card, theme);
     grid.append(card);
   }
@@ -328,17 +335,64 @@ function renderThemeSelection() {
 function selectTheme(themeId) {
   if (themeId === "custom") customThemeDraft = normalizeCustomTheme(interfaceData.customTheme);
   else if (!THEME_PRESETS[themeId]) return;
+  const switchingVersion = (interfaceData.customization.theme === "legacy") !== (themeId === "legacy");
+  if (switchingVersion && !confirmExperienceSwitch()) return;
   interfaceData.customization.theme = themeId;
+  if (themeId !== "legacy") interfaceData.customization.modernTheme = themeId;
   if (themeId === "custom") interfaceData.customTheme = { ...customThemeDraft };
   customThemeDirty = false;
   themeBeforeDraft = { theme: themeId, customTheme: { ...interfaceData.customTheme } };
   applyCustomization();
   saveInterfaceData();
+  if (themeId === "legacy") {
+    if (gameActive && !gameOver) {
+      gameActive = false;
+      resetGame();
+    }
+    stopThemePreview();
+    showLegacyExperience();
+    return;
+  }
   renderThemeSelection();
   syncCustomThemeFields();
   transitionThemePreview();
   drawThemePreview();
   setThemeFeedback(`${themeId === "custom" ? "Custom Theme" : THEME_PRESETS[themeId].name} applied.`, false);
+}
+
+function confirmExperienceSwitch() {
+  if (!gameActive || gameOver) return true;
+  return window.confirm("Switching game versions ends the current run and starts the other version from the beginning. Continue?");
+}
+
+function showLegacyExperience() {
+  stopThemePreview();
+  document.getElementById("app").hidden = true;
+  if (menuAnimationFrame) cancelAnimationFrame(menuAnimationFrame);
+  menuAnimationFrame = 0;
+  const legacy = document.getElementById("legacy-experience");
+  legacy.hidden = false;
+  legacy.classList.add("legacy-experience-active");
+  document.body.classList.add("legacy-experience-mode");
+  const frame = document.getElementById("legacy-game-frame");
+  if (!frame.src || frame.src === "about:blank") frame.src = "./legacy/index.html";
+  frame.onload = () => frame.contentWindow.focus();
+}
+
+function returnToModernExperience() {
+  if (!window.confirm("Return to the modern game? Your legacy session will end and the modern game will restart. Continue?")) return;
+  interfaceData.customization.theme = interfaceData.customization.modernTheme || "crimson";
+  applyCustomization();
+  saveInterfaceData();
+  document.getElementById("legacy-experience").hidden = true;
+  document.getElementById("legacy-experience").classList.remove("legacy-experience-active");
+  document.getElementById("app").hidden = false;
+  document.body.classList.remove("legacy-experience-mode");
+  gameActive = false;
+  resetGame();
+  showScreen("main-menu");
+  startMenuBackground();
+  openThemes("main-menu");
 }
 
 function syncCustomThemeFields() {

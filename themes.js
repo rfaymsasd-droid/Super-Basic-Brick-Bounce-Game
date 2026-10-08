@@ -1,4 +1,20 @@
 const THEME_PRESETS = Object.freeze({
+  legacy: {
+    id: "legacy",
+    name: "Original (Legacy)",
+    description: "Experience the game as it originally was.",
+    background: "#000000",
+    surface: "#000000",
+    accent: "#FFFFFF",
+    accentSecondary: "#FFFFFF",
+    accentTertiary: "#FFFFFF",
+    text: "#FFFFFF",
+    paddle: "#FFFFFF",
+    ball: "#FFFFFF",
+    brick: "#FFFFFF",
+    enemy: "#FFFFFF",
+    projectile: "#FFFFFF"
+  },
   crimson: {
     id: "crimson",
     name: "Crimson Arcade",

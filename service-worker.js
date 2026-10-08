@@ -1,4 +1,4 @@
-const CACHE_NAME = "vector-break-shell-v4";
+const CACHE_NAME = "vector-break-shell-v5";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -12,7 +12,12 @@ const APP_SHELL = [
   "./modes.js",
   "./ui.js",
   "./manifest.webmanifest",
-  "./icon.svg"
+  "./icon.svg",
+  "./legacy/index.html",
+  "./legacy/styles.css",
+  "./legacy/game.js",
+  "./legacy/bricks.js",
+  "./legacy/collisions.js"
 ];
 
 self.addEventListener("install", (event) => {
@@ -41,7 +46,7 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put("./index.html", copy));
           return response;
         })
-        .catch(() => caches.match("./index.html"))
+        .catch(() => caches.match(event.request).then((cached) => cached || caches.match("./index.html")))
     );
     return;
   }
