@@ -177,32 +177,30 @@ function areModeObjectivesComplete() {
 }
 
 function advanceModeLevel() {
+  saveLevelProgress();
   if (activeMode === "campaign" && level === 50) {
     endlessUnlocked = true;
     saveEndlessUnlocked();
     setEndlessOptionState();
     campaignComplete = true;
-    gameOver = true;
+    recordCampaignComplete();
     started = false;
     updateStatus();
+    showLevelComplete(levelStartScore, null);
     return;
   }
   if (activeMode === "daily") {
     dailyComplete = true;
-    gameOver = true;
     started = false;
+    showGameOver();
     return;
   }
 
-  level += 1;
-  if (activeMode === "boss_rush") lives += 1;
-  if (activeMode === "survival" && level % 3 === 0) lives += 1;
+  const next = level + 1;
+  if (activeMode === "survival" && next % 3 === 0) lives += 1;
   if (activeMode === "time_attack") modeTimer += 15 * 60;
-  initializeModeLevel();
   started = false;
-  ballAttached = true;
-  balls = [ball];
-  positionBall();
+  showLevelComplete(levelStartScore, next);
 }
 
 function drawModeOverlayTitle() {

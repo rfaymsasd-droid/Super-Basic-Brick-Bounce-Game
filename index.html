@@ -7,43 +7,145 @@
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
-    <main>
-      <div class="mode-controls">
-        <label for="mode-select">Game mode</label>
-        <select id="mode-select">
-          <option value="campaign" selected>Campaign · 1–50</option>
-          <option value="classic">Classic Arcade</option>
-          <option value="endless" disabled>Endless (Unlock by completing campaign)</option>
-          <option value="time_attack">Time Attack · 2 minutes</option>
-          <option value="boss_rush">Boss Rush</option>
-          <option value="survival">Survival</option>
-          <option value="daily">Daily Challenge</option>
-          <option value="zen">Zen</option>
-          <option value="coop">Local Co-op</option>
-        </select>
-        <button id="restart-mode" type="button">Start / Restart</button>
+    <canvas id="menu-background" width="1440" height="900" aria-hidden="true"></canvas>
+    <main id="app">
+      <section id="main-menu" class="screen menu-screen" aria-labelledby="game-logo">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <p class="eyebrow">ARCADE CLASSICS REIMAGINED</p>
+        <h1 id="game-logo">BRICK<span>BOUNCE</span></h1>
+        <p class="menu-tagline">Break the pattern. Own the galaxy.</p>
+        <nav class="main-menu-actions" aria-label="Main menu">
+          <button class="primary-button" data-action="play">Play</button>
+          <button id="continue-button" data-action="continue">Continue</button>
+          <button data-action="modes">Modes</button>
+          <button data-action="customize">Customize</button>
+          <button data-action="achievements">Achievements</button>
+          <button data-action="statistics">Statistics</button>
+          <button data-action="settings">Settings</button>
+          <button data-action="fullscreen">Full screen</button>
+        </nav>
+        <p class="menu-hint">ARROWS / A D TO MOVE <span>·</span> SPACE TO LAUNCH <span>·</span> P TO PAUSE</p>
+      </section>
+
+      <div id="panel-root">
+        <section id="mode-screen" class="screen content-screen" hidden>
+          <button class="back-button" data-action="back">← Main menu</button>
+          <p class="eyebrow">CHOOSE YOUR CHALLENGE</p>
+          <h2>Game Modes</h2>
+          <div id="mode-cards" class="mode-cards"></div>
+        </section>
+
+        <section id="customize-screen" class="screen content-screen" hidden>
+          <button class="back-button" data-action="back">← Main menu</button>
+          <p class="eyebrow">MAKE IT YOURS</p>
+          <h2>Customize</h2>
+          <div class="customization-grid">
+            <label>Ball skin<select id="ball-skin"></select></label>
+            <label>Paddle skin<select id="paddle-skin"></select></label>
+            <label>Theme<select id="theme-skin"></select></label>
+            <label>Trail<select id="trail-skin"></select></label>
+          </div>
+        </section>
+
+        <section id="achievements-screen" class="screen content-screen" hidden>
+          <button class="back-button" data-action="back">← Main menu</button>
+          <p class="eyebrow">MILESTONES</p>
+          <h2>Achievements</h2>
+          <div id="achievement-list" class="achievement-list"></div>
+        </section>
+
+        <section id="statistics-screen" class="screen content-screen" hidden>
+          <button class="back-button" data-action="back">← Main menu</button>
+          <p class="eyebrow">YOUR ARCADE RECORD</p>
+          <h2>Statistics</h2>
+          <div id="statistics-list" class="statistics-grid"></div>
+        </section>
+
+        <section id="settings-screen" class="screen content-screen" hidden>
+          <button class="back-button" data-action="back">← Back</button>
+          <p class="eyebrow">TUNE YOUR EXPERIENCE</p>
+          <h2>Settings</h2>
+          <div class="settings-list">
+            <label><span>Sound effects</span><input id="sound-setting" type="checkbox" checked></label>
+            <label><span>Reduce motion</span><input id="motion-setting" type="checkbox"></label>
+            <button id="fullscreen-button" type="button">Full screen</button>
+          </div>
+        </section>
+
+        <section id="game-shell" class="screen game-screen" hidden>
+          <header class="game-header">
+            <div class="compact-logo">BRICK<span>BOUNCE</span></div>
+            <div class="mode-controls">
+              <label class="visually-hidden" for="mode-select">Game mode</label>
+              <select id="mode-select">
+                <option value="campaign" selected>Campaign</option>
+                <option value="classic">Classic Arcade</option>
+                <option value="endless" disabled>Endless (Complete Campaign to unlock)</option>
+                <option value="time_attack">Time Attack</option>
+                <option value="boss_rush">Boss Rush</option>
+                <option value="survival">Survival</option>
+                <option value="daily">Daily Challenge</option>
+                <option value="zen">Zen</option>
+                <option value="coop">Local Co-op</option>
+              </select>
+              <button id="restart-mode" type="button">Restart</button>
+              <button id="pause-button" type="button">Ⅱ Pause</button>
+              <button id="game-fullscreen-button" type="button">Full screen</button>
+            </div>
+          </header>
+          <div class="game-status" aria-live="polite">
+            <span>Mode <strong id="mode">Campaign</strong></span>
+            <span>World <strong id="world">The Beginning · 1/50</strong></span>
+            <span>Level <strong id="level">1</strong></span>
+            <span>Lives <strong id="lives">3</strong></span>
+            <span>Time <strong id="timer"></strong></span>
+            <span>Score <strong id="score">0</strong></span>
+            <span>Best <strong id="high-score">0</strong></span>
+            <span>Combo <strong id="combo">x0</strong></span>
+            <span>Bricks <strong id="bricks-left">0</strong></span>
+            <span>Invaders <strong id="invaders-left">0</strong></span>
+          </div>
+          <canvas id="game" width="900" height="650" aria-label="Brick breaker and space invaders game"></canvas>
+          <p id="powerup-status" aria-live="polite">No active power-ups</p>
+          <p class="game-instructions">Move with arrows or A/D. Co-op: Player 1 uses arrows, Player 2 uses A/D. Space launches, F fires lasers, P pauses.</p>
+        </section>
+
+        <section id="pause-panel" class="screen dialog-screen" aria-labelledby="pause-title" hidden>
+          <div class="dialog-card">
+            <p class="eyebrow">TAKE A BREATHER</p><h2 id="pause-title">Paused</h2>
+            <button class="primary-button" data-action="resume">Resume</button>
+            <button data-action="restart">Restart</button>
+            <button data-action="settings">Settings</button>
+            <button data-action="menu">Main Menu</button>
+          </div>
+        </section>
+
+        <section id="level-complete-panel" class="screen dialog-screen" aria-labelledby="level-result-title" hidden>
+          <div class="dialog-card">
+            <p class="eyebrow">WAVE CLEARED</p><h2 id="level-result-title">Level Complete</h2>
+            <p class="stars" id="level-stars">★★★</p>
+            <div class="result-breakdown"><span>Level score <strong id="level-score">0</strong></span><span>Life bonus <strong id="level-bonus">0</strong></span></div>
+            <button id="next-level-button" class="primary-button" data-action="next">Next Level</button>
+            <button data-action="menu">Main Menu</button>
+          </div>
+        </section>
+
+        <section id="game-over-panel" class="screen dialog-screen" aria-labelledby="game-over-title" hidden>
+          <div class="dialog-card">
+            <p class="eyebrow">RUN COMPLETE</p><h2 id="game-over-title">Game Over</h2>
+            <div class="result-breakdown"><span>Final score <strong id="final-score">0</strong></span><span>Best score <strong id="best-score">0</strong></span></div>
+            <button class="primary-button" data-action="retry">Retry</button>
+            <button data-action="menu">Main Menu</button>
+          </div>
+        </section>
       </div>
-      <div class="game-status" aria-live="polite">
-        <span>Mode <strong id="mode">Campaign</strong></span>
-        <span>World <strong id="world">The Beginning · 1/50</strong></span>
-        <span>Level <strong id="level">1</strong></span>
-        <span>Lives <strong id="lives">3</strong></span>
-        <span>Time <strong id="timer"></strong></span>
-        <span>Score <strong id="score">0</strong></span>
-        <span>High score <strong id="high-score">0</strong></span>
-        <span>Combo <strong id="combo">x0</strong></span>
-        <span>Bricks <strong id="bricks-left">0</strong></span>
-        <span>Invaders <strong id="invaders-left">0</strong></span>
-      </div>
-      <canvas id="game" width="900" height="650" aria-label="Brick breaker and space invaders game"></canvas>
-      <p id="powerup-status" aria-live="polite">No active power-ups</p>
-      <p>Move with the left and right arrow keys or A and D. In co-op, Player 1 uses the arrows and Player 2 uses A/D. Press Space to launch or release a magnet-caught ball, F to fire lasers, P to pause, or R to restart.</p>
-   </main>
+    </main>
 
    <script src="game.js"></script>
    <script src="bricks.js"></script>
    <script src="collisions.js"></script>
    <script src="mechanics.js"></script>
    <script src="modes.js"></script>
+   <script src="ui.js"></script>
   </body>
 </html>

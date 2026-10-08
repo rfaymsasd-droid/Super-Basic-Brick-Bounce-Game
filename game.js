@@ -63,6 +63,7 @@ let endlessUnlocked = false;
 let campaignComplete = false;
 let dailyComplete = false;
 let gravityField = null;
+let levelStartScore = 0;
 
 const keys = {};
 
@@ -81,14 +82,17 @@ document.addEventListener("keydown", function (event) {
 
   if (event.code === "Space") {
     event.preventDefault();
-    if (!event.repeat && !paused && !gameOver) {
+    if (!event.repeat && !paused && !gameOver && gameActive) {
+      recordLaunch();
       started = true;
       launchBall();
     }
-  } else if (key === "r" && !event.repeat) {
+  } else if (key === "r" && !event.repeat && (gameActive || gameOver)) {
     resetGame();
-  } else if (key === "p" && !event.repeat && !gameOver) {
-    paused = !paused;
+    beginGame(false);
+  } else if (key === "p" && !event.repeat && !gameOver && gameActive) {
+    if (paused) resumeGame();
+    else pauseGame();
   }
 
   if (event.key.startsWith("Arrow")) {
@@ -101,7 +105,7 @@ document.addEventListener("keyup", function (event) {
 });
 
 function update() {
-  if (paused || gameOver) {
+  if (!gameActive || paused || gameOver) {
     return;
   }
 
@@ -117,8 +121,7 @@ function update() {
     modeTimer -= 1;
     if (modeTimer <= 0) {
       modeTimer = 0;
-      gameOver = true;
-      updateStatus();
+      showGameOver();
       return;
     }
   }
@@ -137,7 +140,10 @@ function update() {
     if (targetBall.caught) continue;
     bounceOffBricks(targetBall);
     bounceOffInvaders(targetBall);
-    if (targetBall.y > HEIGHT) balls.splice(index, 1);
+    if (targetBall.y > HEIGHT) {
+      balls.splice(index, 1);
+      recordMiss();
+    }
   }
   if (balls.length === 0) {
     loseLife();
@@ -207,6 +213,11 @@ function launchBall() {
 
 function moveBall(targetBall) {
   const speedFactor = activeEffects.slow ? 0.55 : targetBall.slowTimer > 0 ? 0.65 : 1;
+  if (interfaceData.customization.trail !== "none") {
+    targetBall.trail ||= [];
+    targetBall.trail.push({ x: targetBall.x + targetBall.width / 2, y: targetBall.y + targetBall.height / 2 });
+    if (targetBall.trail.length > 8) targetBall.trail.shift();
+  }
   if (gravityField) {
     const dx = gravityField.x - (targetBall.x + targetBall.width / 2);
     const dy = gravityField.y - (targetBall.y + targetBall.height / 2);
@@ -333,7 +344,7 @@ function loseLife() {
   secondPaddle.width = 72;
   updateStatus();
   if (lives === 0) {
-    gameOver = true;
+    showGameOver();
     return;
   }
 
@@ -347,6 +358,7 @@ function registerTargetHit(points) {
   comboTimer = COMBO_DURATION;
   score += points * Math.min(combo, 5);
   if (activeEffects.double) score += points * Math.min(combo, 5);
+  recordTargetHit();
   if (score > highScore) {
     highScore = score;
     saveHighScore();
@@ -376,10 +388,25 @@ function draw() {
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
   ctx.fillStyle = "white";
+  ctx.fillStyle = getCustomizationColor("paddle");
   drawSquircle(paddle.x, paddle.y, paddle.width, paddle.height);
   if (activeMode === "coop") drawSquircle(secondPaddle.x, secondPaddle.y, secondPaddle.width, secondPaddle.height);
   for (const targetBall of balls) {
-    ctx.fillStyle = targetBall.piercing ? "#ff8a3d" : "white";
+    const trailColor = interfaceData.customization.trail === "none"
+      ? null
+      : interfaceData.customization.trail === "spark" ? "#ffe45e"
+        : interfaceData.customization.trail === "ember" ? "#ff704e" : "#4de3ff";
+    if (trailColor && targetBall.trail) {
+      targetBall.trail.forEach((point, index) => {
+        ctx.globalAlpha = (index + 1) / targetBall.trail.length * 0.25;
+        ctx.fillStyle = trailColor;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, targetBall.width * (index + 1) / targetBall.trail.length / 2, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = targetBall.piercing ? "#ff8a3d" : getCustomizationColor("ball");
     drawSquircle(targetBall.x, targetBall.y, targetBall.width, targetBall.height);
   }
   drawBricks();
@@ -537,6 +564,7 @@ function resetGame() {
   gameOver = false;
   campaignComplete = false;
   dailyComplete = false;
+  levelStartScore = 0;
   lives = getModeLives();
   if (activeMode === "coop") {
     paddle.x = WIDTH / 4 - paddle.width / 2;
@@ -549,8 +577,14 @@ function resetGame() {
 
 function start() {
   endlessUnlocked = loadEndlessUnlocked();
-  document.getElementById("mode-select").addEventListener("change", resetGame);
-  document.getElementById("restart-mode").addEventListener("click", resetGame);
+  document.getElementById("mode-select").addEventListener("change", () => {
+    resetGame();
+    beginGame(false);
+  });
+  document.getElementById("restart-mode").addEventListener("click", () => {
+    resetGame();
+    beginGame(false);
+  });
   setEndlessOptionState();
   resetGame();
   lastTime = performance.now();

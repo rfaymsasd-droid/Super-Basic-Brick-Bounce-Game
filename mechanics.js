@@ -60,6 +60,7 @@ function damageBrick(index, targetBall) {
 function destroyBrick(index) {
   const [brick] = bricks.splice(index, 1);
   if (!brick) return;
+  recordDestroyedBrick();
   dropPowerUp(brick.x + brick.width / 2, brick.y, 0.14);
   if (brick.type === "explosive") {
     for (let neighborIndex = bricks.length - 1; neighborIndex >= 0; neighborIndex -= 1) {
@@ -294,6 +295,7 @@ function updatePowerUpStatus() {
 }
 
 function playPickupSound(id) {
+  if (!interfaceData.settings.sound) return;
   const AudioContextType = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextType) return;
   soundContext ||= new AudioContextType();
