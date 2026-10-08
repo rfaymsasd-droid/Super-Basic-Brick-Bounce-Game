@@ -149,6 +149,14 @@
               </select>
               <button id="restart-mode" type="button">Restart</button>
               <button id="launch-button" type="button" aria-label="Launch or release the ball">Launch</button>
+              <label class="ability-equipment">Ability
+                <select id="special-ability-select" aria-label="Equipped special ability">
+                  <option value="pulse">Pulse · 40 energy</option>
+                  <option value="overdrive">Overdrive · 70 energy</option>
+                  <option value="timeWarp">Time Warp · 100 energy</option>
+                </select>
+              </label>
+              <button id="special-ability-button" type="button" aria-label="Activate equipped special ability">Pulse · 0/40</button>
               <button id="pause-button" type="button">Ⅱ Pause</button>
               <button id="game-fullscreen-button" type="button">Full screen</button>
             </div>
@@ -165,13 +173,19 @@
             <span>Bricks <strong id="bricks-left">0</strong></span>
             <span>Invaders <strong id="invaders-left">0</strong></span>
           </div>
+          <div class="ability-meter" role="group" aria-label="Special ability energy">
+            <span id="ability-status" aria-live="polite">Special energy · 0/100</span>
+            <div class="progress-track" role="progressbar" aria-label="Special energy" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <div id="ability-energy-bar"></div>
+            </div>
+          </div>
           <div class="objective-progress" aria-label="Objective progress">
             <div><span>Bricks</span><div class="progress-track"><div id="bricks-progress-bar"></div></div></div>
             <div><span>Invaders</span><div class="progress-track"><div id="invaders-progress-bar"></div></div></div>
           </div>
           <canvas id="game" width="900" height="650" tabindex="0" role="application" aria-label="Brick breaker and space invaders game" aria-describedby="game-instructions"></canvas>
           <p id="powerup-status" aria-live="polite">No active power-ups</p>
-          <p id="game-instructions" class="game-instructions">Move with arrows, A/D, mouse, touch, or a controller. Co-op: Player 1 uses arrows, Player 2 uses A/D. Space or Launch releases the ball; P or Pause pauses. Controller: left stick/D-pad, A launches, Start pauses.</p>
+          <p id="game-instructions" class="game-instructions">Move with arrows, A/D, mouse, touch, or a controller. Co-op: Player 1 uses arrows, Player 2 uses A/D. Space or Launch releases the ball; E or the Ability button activates your equipped ability; P or Pause pauses. Controller: left stick/D-pad, A launches, B activates the ability, Start pauses.</p>
         </section>
 
         <section id="pause-panel" class="screen dialog-screen" aria-labelledby="pause-title" hidden>

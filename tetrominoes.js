@@ -52,6 +52,7 @@ let tetrominoWave = "mixed";
 let tetrominoTargetActive = 0;
 let tetrominoSpawnCount = 0;
 let recentTetrominoXs = [];
+let nextTetrominoId = 1;
 
 function normalizeObstacleCells(cells) {
   let minX = Infinity;
@@ -235,6 +236,7 @@ function spawnTetromino() {
     .reduce((total, character) => total + character.charCodeAt(0), 0) % TETROMINO_COLORS.length;
 
   fallingTetrominoes.push({
+    id: nextTetrominoId++,
     name: shape.name,
     cells,
     x,
@@ -417,6 +419,7 @@ function resolveTetrominoBallCollision(targetBall) {
         spawnParticles(targetBall.x + targetBall.width / 2, targetBall.y + targetBall.height / 2,
           gameTheme[piece.color] || gameTheme.accent, Math.max(1, Math.round(3 * intensity)), 0.8 * intensity);
       }
+      registerTetrominoRicochet(targetBall, piece.id);
       return true;
     }
   }

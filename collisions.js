@@ -34,12 +34,24 @@ function bounceOffPaddle(targetBall = ball, targetPaddle = paddle) {
     if (catchBall(targetBall, targetPaddle)) return;
     const impactOffset = (targetBall.x + targetBall.width / 2 - (targetPaddle.x + targetPaddle.width / 2)) / (targetPaddle.width / 2);
     const angle = Math.max(-1, Math.min(1, impactOffset)) * Math.PI / 3;
-    const speed = BALL_SPEED + Math.min((level - 1) * 0.2, 1.5);
+    const perfectHit = Math.abs(impactOffset) <= 0.18;
+    const speed = (BALL_SPEED + Math.min((level - 1) * 0.2, 1.5)) * (perfectHit ? 1.08 : 1);
     targetBall.vx = Math.sin(angle) * speed;
     targetBall.vy = -Math.cos(angle) * speed;
+    targetBall.trickShotPieces = [];
+    targetBall.trickShotTimer = 0;
     paddleImpact = 9;
     impactPaddle = targetPaddle;
-    playGameSound("paddle");
+    if (perfectHit) {
+      chargeSpecialAbility(20);
+      registerBonusPoints(100);
+      perfectHitTimer = 45;
+      perfectHitX = targetPaddle.x + targetPaddle.width / 2;
+      playGameSound("perfect");
+      if (interfaceData.settings.cameraShake && !interfaceData.settings.reducedMotion) cameraShake = Math.max(cameraShake, 2);
+    } else {
+      playGameSound("paddle");
+    }
     spawnParticles(targetBall.x + targetBall.width / 2, targetPaddle.y, gameTheme.paddle, 7, 1.7);
   }
 }

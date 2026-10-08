@@ -54,6 +54,11 @@ let score = 0;
 let highScore = loadHighScore();
 let combo = 0;
 let comboTimer = 0;
+let perfectHitTimer = 0;
+let perfectHitX = WIDTH / 2;
+let trickShotTimer = 0;
+let trickShotX = WIDTH / 2;
+let trickShotY = HEIGHT / 2;
 let paused = false;
 let gameOver = false;
 let activeMode = "campaign";
@@ -108,6 +113,8 @@ document.addEventListener("keydown", function (event) {
   } else if (key === "r" && !event.repeat && (gameActive || gameOver)) {
     resetGame();
     beginGame(false);
+  } else if (key === "e" && !event.repeat && gameActive) {
+    activateSpecialAbility();
   } else if ((key === "p" || key === "escape") && !event.repeat && !gameOver && gameActive) {
     if (paused) resumeGame();
     else pauseGame();
@@ -253,8 +260,9 @@ function updateGamepad() {
       paddleTargetX += move * paddle.speed;
     }
     const launchPressed = Boolean(gamepad.buttons[0]?.pressed);
+    const abilityPressed = Boolean(gamepad.buttons[1]?.pressed);
     const pausePressed = Boolean(gamepad.buttons[9]?.pressed);
-    const previous = gamepadButtonState.get(gamepad.index) || { launch: false, pause: false };
+    const previous = gamepadButtonState.get(gamepad.index) || { launch: false, ability: false, pause: false };
     if (launchPressed && !previous.launch && gameActive && !paused && !gameOver) {
       recordLaunch();
       started = true;
@@ -264,7 +272,8 @@ function updateGamepad() {
       if (paused) resumeGame();
       else pauseGame();
     }
-    gamepadButtonState.set(gamepad.index, { launch: launchPressed, pause: pausePressed });
+    if (abilityPressed && !previous.ability) activateSpecialAbility();
+    gamepadButtonState.set(gamepad.index, { launch: launchPressed, ability: abilityPressed, pause: pausePressed });
   }
 }
 
@@ -289,6 +298,8 @@ function movePaddle() {
 
 function positionBall() {
   if (balls.length === 0) balls = [ball];
+  ball.trickShotPieces = [];
+  ball.trickShotTimer = 0;
   ball.caught = false;
   ball.piercing = Boolean(activeEffects.piercing);
   ball.slowTimer = 0;
@@ -476,6 +487,37 @@ function registerTargetHit(points) {
   updateStatus();
 }
 
+function registerBonusPoints(points) {
+  score += points;
+  if (score > highScore) {
+    highScore = score;
+    saveHighScore();
+  }
+  updateStatus();
+}
+
+function registerTetrominoRicochet(targetBall, pieceId) {
+  targetBall.trickShotPieces ||= [];
+  if (targetBall.trickShotTimer <= 0) targetBall.trickShotPieces = [];
+  targetBall.trickShotTimer = 600;
+  if (targetBall.trickShotPieces.includes(pieceId)) return;
+  targetBall.trickShotPieces.push(pieceId);
+  if (targetBall.trickShotPieces.length < 3) return;
+
+  targetBall.trickShotPieces = [];
+  targetBall.trickShotTimer = 0;
+  chargeSpecialAbility(25);
+  registerBonusPoints(300);
+  playGameSound("trick");
+  if (!interfaceData.settings.reducedMotion && interfaceData.settings.effectsIntensity > 0) {
+    spawnParticles(targetBall.x + targetBall.width / 2, targetBall.y + targetBall.height / 2,
+      gameTheme.accentSecondary, 14, 2.5);
+  }
+  trickShotTimer = 55;
+  trickShotX = targetBall.x + targetBall.width / 2;
+  trickShotY = targetBall.y;
+}
+
 function loadHighScore() {
   try {
     return Number(localStorage.getItem("brickBounceHighScore")) || 0;
@@ -514,6 +556,23 @@ function draw() {
   ctx.fillStyle = getCustomizationColor("paddle");
   drawPaddle(paddle);
   if (activeMode === "coop") drawPaddle(secondPaddle);
+  if (perfectHitTimer > 0 || trickShotTimer > 0) {
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.font = "bold 17px system-ui";
+    if (perfectHitTimer > 0) {
+      ctx.globalAlpha = Math.min(1, perfectHitTimer / 12);
+      ctx.fillStyle = gameTheme.accentSecondary;
+      const rise = interfaceData.settings.reducedMotion ? 0 : (45 - perfectHitTimer) * 0.35;
+      ctx.fillText("PERFECT HIT! +100", perfectHitX, paddle.y - 15 - rise);
+    } else {
+      ctx.globalAlpha = Math.min(1, trickShotTimer / 12);
+      ctx.fillStyle = gameTheme.accent;
+      const rise = interfaceData.settings.reducedMotion ? 0 : (55 - trickShotTimer) * 0.35;
+      ctx.fillText("TRICK SHOT! +300", trickShotX, trickShotY - rise);
+    }
+    ctx.restore();
+  }
   for (const targetBall of balls) {
     const trailColor = interfaceData.settings.reducedMotion || interfaceData.customization.trail === "none"
       ? null
@@ -580,6 +639,11 @@ function drawPaddle(targetPaddle) {
   ctx.shadowColor = getCustomizationColor("paddle");
   ctx.shadowBlur = interfaceData.settings.reducedMotion ? 0 : 8 * interfaceData.settings.effectsIntensity;
   drawSquircle(targetPaddle.x, targetPaddle.y, targetPaddle.width, targetPaddle.height);
+  if (targetPaddle === paddle) {
+    ctx.fillStyle = `${gameTheme.text}bb`;
+    drawSquircle(targetPaddle.x + targetPaddle.width * 0.42, targetPaddle.y + 2,
+      targetPaddle.width * 0.16, Math.max(2, targetPaddle.height - 4));
+  }
   ctx.restore();
 }
 
@@ -655,6 +719,7 @@ function updateStatus() {
   document.getElementById("bricks-progress-bar").style.width = `${Math.max(0, Math.min(1, brickProgress)) * 100}%`;
   document.getElementById("invaders-progress-bar").style.width = `${Math.max(0, Math.min(1, invaderProgress)) * 100}%`;
   updatePowerUpStatus();
+  updateSpecialAbilityStatus();
 }
 
 function updateStatusCounter(id, target, format = (value) => String(value)) {
@@ -788,8 +853,11 @@ function resetGame() {
   score = 0;
   combo = 0;
   comboTimer = 0;
+  perfectHitTimer = 0;
+  trickShotTimer = 0;
   fallingPowerUps = [];
   activeEffects = {};
+  resetSpecialAbility();
   laserShots = [];
   shieldCharges = 0;
   laserCooldown = 0;

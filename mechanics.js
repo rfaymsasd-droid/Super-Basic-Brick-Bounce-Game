@@ -23,6 +23,14 @@ let musicMode = "";
 let musicInterval = 0;
 let musicStep = 0;
 let musicVolumeApplied = -1;
+const SPECIAL_ABILITIES = {
+  pulse: { name: "Pulse", cost: 40 },
+  overdrive: { name: "Overdrive", cost: 70 },
+  timeWarp: { name: "Time Warp", cost: 100 }
+};
+let specialAbilityEnergy = 0;
+let equippedSpecialAbility = "pulse";
+let specialAbilityRemaining = 0;
 
 function playGameSound(kind) {
   if (!interfaceData.settings.sound) return;
@@ -30,7 +38,7 @@ function playGameSound(kind) {
   if (!AudioContextType) return;
   soundContext ||= new AudioContextType();
   if (soundContext.state === "suspended") soundContext.resume();
-  const notes = { wall: [260, 0.045], paddle: [440, 0.08], brick: [330, 0.06], enemy: [185, 0.09], powerup: [620, 0.1], destroy: [520, 0.11] };
+  const notes = { wall: [260, 0.045], paddle: [440, 0.08], brick: [330, 0.06], enemy: [185, 0.09], powerup: [620, 0.1], destroy: [520, 0.11], perfect: [880, 0.12], ability: [720, 0.13], trick: [990, 0.14] };
   const [frequency, volume] = notes[kind] || notes.brick;
   const oscillator = soundContext.createOscillator();
   const gain = soundContext.createGain();
@@ -144,6 +152,11 @@ function updateGameEffects() {
     if (invader.flashTimer > 0) invader.flashTimer -= 1;
   }
   if (paddleImpact > 0) paddleImpact -= 1;
+  if (perfectHitTimer > 0) perfectHitTimer -= 1;
+  if (trickShotTimer > 0) trickShotTimer -= 1;
+  for (const targetBall of balls) {
+    if (targetBall.trickShotTimer > 0) targetBall.trickShotTimer -= 1;
+  }
   if (cameraShake > 0) cameraShake *= 0.82;
   if (cameraShake < 0.15) cameraShake = 0;
 }
@@ -192,6 +205,7 @@ function damageBrick(index, targetBall) {
 function destroyBrick(index) {
   const [brick] = bricks.splice(index, 1);
   if (!brick) return;
+  chargeSpecialAbility(3);
   spawnParticles(brick.x + brick.width / 2, brick.y + brick.height / 2, brick.type === "golden" ? gameTheme.accentSecondary : gameTheme.brick, 10, 2.7);
   cameraShake = Math.max(cameraShake, 1.4);
   playGameSound("destroy");
@@ -224,6 +238,7 @@ function damageInvader(index, targetBall) {
   invader.health -= 1;
   if (invader.health > 0) return;
   const [destroyed] = invaders.splice(index, 1);
+  chargeSpecialAbility(3);
   spawnParticles(destroyed.x + destroyed.width / 2, destroyed.y + destroyed.height / 2, gameTheme.accent, destroyed.type === "boss" ? 24 : 12, 3.2);
   cameraShake = Math.max(cameraShake, destroyed.type === "boss" ? 5 : 2.2);
   registerTargetHit(destroyed.type === "boss" ? 3000 : destroyed.type === "tank" ? 100 : 50);
@@ -257,6 +272,10 @@ function isInvaderShielded(invader) {
 
 function updateMechanics() {
   movingTick += 1;
+  if (specialAbilityRemaining > 0) {
+    specialAbilityRemaining -= 1;
+    if (specialAbilityRemaining === 0) updateSpecialAbilityStatus();
+  }
   for (const brick of bricks) {
     if (brick.type === "moving") {
       brick.x += brick.moveDirection * 0.65 * (activeEffects.slow ? 0.55 : 1);
@@ -294,6 +313,68 @@ function updateMechanics() {
     }
   }
   updatePowerUpStatus();
+  updateSpecialAbilityStatus();
+}
+
+function setEquippedSpecialAbility(ability) {
+  if (!Object.prototype.hasOwnProperty.call(SPECIAL_ABILITIES, ability)) return;
+  equippedSpecialAbility = ability;
+  updateSpecialAbilityStatus();
+}
+
+function resetSpecialAbility() {
+  specialAbilityEnergy = 0;
+  specialAbilityRemaining = 0;
+  updateSpecialAbilityStatus();
+}
+
+function chargeSpecialAbility(amount) {
+  specialAbilityEnergy = Math.min(100, specialAbilityEnergy + amount);
+  updateSpecialAbilityStatus();
+}
+
+function activateSpecialAbility() {
+  if (!gameActive || !started || paused || gameOver) return false;
+  if (specialAbilityRemaining > 0) return false;
+  const ability = SPECIAL_ABILITIES[equippedSpecialAbility];
+  if (specialAbilityEnergy < ability.cost) return false;
+
+  specialAbilityEnergy -= ability.cost;
+  playGameSound("ability");
+  if (equippedSpecialAbility === "pulse") {
+    applyShockwave();
+    specialAbilityRemaining = 30;
+  } else if (equippedSpecialAbility === "overdrive") {
+    setEffect("piercing", 360);
+    for (const targetBall of balls) targetBall.piercing = true;
+    specialAbilityRemaining = 360;
+  } else {
+    setEffect("slow", 360);
+    specialAbilityRemaining = 360;
+  }
+  updateSpecialAbilityStatus();
+  return true;
+}
+
+function updateSpecialAbilityStatus() {
+  const ability = SPECIAL_ABILITIES[equippedSpecialAbility];
+  const button = document.getElementById("special-ability-button");
+  const status = document.getElementById("ability-status");
+  const bar = document.getElementById("ability-energy-bar");
+  const progress = bar?.parentElement;
+  if (!button || !status || !bar || !progress) return;
+  const ready = specialAbilityEnergy >= ability.cost;
+  button.textContent = specialAbilityRemaining > 0
+    ? `${ability.name} · ${Math.ceil(specialAbilityRemaining / 60)}s`
+    : `${ability.name} · ${Math.floor(specialAbilityEnergy)}/${ability.cost}`;
+  button.disabled = !ready || specialAbilityRemaining > 0 || !gameActive || !started || paused || gameOver;
+  document.getElementById("special-ability-select").disabled = started;
+  status.textContent = `Special energy · ${Math.floor(specialAbilityEnergy)}/100`;
+  bar.style.width = `${specialAbilityEnergy}%`;
+  progress.setAttribute("aria-valuenow", String(Math.floor(specialAbilityEnergy)));
+  button.setAttribute("aria-label", specialAbilityRemaining > 0
+    ? `${ability.name} active for ${Math.ceil(specialAbilityRemaining / 60)} seconds`
+    : `Activate ${ability.name}, costs ${ability.cost} energy${ready ? ", ready" : ""}`);
 }
 
 function updateFallingPowerUps() {
@@ -319,7 +400,9 @@ function collectPowerUp(powerUp) {
         ...sourceBall,
         vx: sourceBall.vx + direction * 2.2 || direction * 2.2,
         vy: sourceBall.vy || -BALL_SPEED,
-        caught: false
+        caught: false,
+        trickShotPieces: [],
+        trickShotTimer: 0
       });
     }
   } else if (powerUp.id === "life") {

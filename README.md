@@ -19,11 +19,12 @@ Open <http://localhost:8000>. The game has no build step. Campaign progress, bes
 | Left / Right arrows or A / D | Move the paddle |
 | Mouse movement or touch drag | Aim the paddle |
 | Space or **Launch** | Launch or release a caught ball |
+| E or **Ability** | Activate the equipped special ability |
 | P, Escape, or **Pause** | Pause or resume |
 | R | Restart |
 | F | Fire while Laser Paddle is active |
 | Controller left stick / D-pad | Move the paddle |
-| Controller A / Start | Launch / pause |
+| Controller A / B / Start | Launch / activate ability / pause |
 
 In Local Co-op, Player 1 uses the arrows and Player 2 uses A/D. Mouse or touch control targets the paddle on the corresponding half of the playfield.
 
@@ -42,7 +43,7 @@ The ten-level Crimson Sector introduces mechanics in stages instead of relying o
 9. Chain reactions and a mixed elite formation.
 10. Armored and explosive targets alongside the three-phase Crimson boss. Defeating it unlocks Endless.
 
-The HUD tracks score, personal best, combo, lives, level, remaining targets, and objective progress. Paddle impact position aims the ball; enemy projectiles threaten the paddle but cannot damage bricks.
+The HUD tracks score, personal best, combo, lives, level, remaining targets, objective progress, and special ability energy. Paddle impact position aims the ball; centered sweet-spot hits award bonus points and energy, and destroying bricks or invaders also charges the meter. Choose Pulse, Overdrive, or Time Warp before launching. Ricocheting off three distinct falling shapes within ten seconds, without a paddle hit between them, earns a Tetris trick-shot bonus. Enemy projectiles threaten the paddle but cannot damage bricks.
 
 ## Other modes and features
 
@@ -52,6 +53,7 @@ The HUD tracks score, personal best, combo, lives, level, remaining targets, and
 - An **Original (Legacy)** theme launches the authentic pre-modernization game in an isolated frame. Its original HTML, CSS, and JavaScript are preserved from upstream commit [`876816664f75c670a1542e2cd37df887c5d8ca30`](https://github.com/iherrick-mps/Super-Basic-Brick-Bounce-Game/commit/876816664f75c670a1542e2cd37df887c5d8ca30) under `legacy/`.
 - Responsive pointer/touch input, keyboard and standard gamepad controls, fixed-step physics, and sub-stepped fast-ball collision checks.
 - Falling connected polyomino obstacles with moving-surface ball bounces, level-scaled difficulty, and optional cosmetic-only impact effects.
+- Perfect paddle hits and Tetris trick shots reward precision with bonus score and special energy; charge and activate Pulse, Overdrive, or Time Warp during modern gameplay.
 - Procedurally generated connected obstacle shapes, configurable Off/Low/Normal/High/Chaos density (3–5 active at Low and 5–8 at Normal), size and speed controls, and separate glow/particle preferences.
 - Colorblind-friendly target markings, reduced motion, adjustable effects and audio, and automatic pause when the tab loses focus.
 - Optional installable PWA shell. Crimson Arcade uses nearly black scenery, white interface text, red highlights and glow, color-coded bricks, and distinctive special-target/power-up colors.

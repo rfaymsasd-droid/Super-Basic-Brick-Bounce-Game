@@ -56,7 +56,7 @@ function loadInterfaceData() {
       animatedGrid: true, tetrisEffects: true, obstacleDensity: "low",
       obstacleMinSize: 20, obstacleMaxSize: 50, obstacleSpeed: 1,
       obstacleVisualIntensity: 0.6, obstacleExplosionParticles: true,
-      obstacleShapeVariety: true
+      obstacleShapeVariety: true, specialAbility: "pulse"
     }
   };
   try {
@@ -104,7 +104,10 @@ function normalizeObstacleSettings(settings) {
     obstacleVisualIntensity: clamp(settings.obstacleVisualIntensity, 0, 1, 0.6),
     obstacleExplosionParticles: settings.obstacleExplosionParticles !== false,
     obstacleShapeVariety: settings.obstacleShapeVariety !== false,
-    tetrisEffects: settings.tetrisEffects !== false
+    tetrisEffects: settings.tetrisEffects !== false,
+    specialAbility: ["pulse", "overdrive", "timeWarp"].includes(settings.specialAbility)
+      ? settings.specialAbility
+      : "pulse"
   };
 }
 
@@ -147,6 +150,15 @@ function initializeInterface() {
       launchBall();
     }
   });
+  const abilitySelect = document.getElementById("special-ability-select");
+  abilitySelect.value = interfaceData.settings.specialAbility;
+  setEquippedSpecialAbility(abilitySelect.value);
+  abilitySelect.addEventListener("change", () => {
+    interfaceData.settings.specialAbility = abilitySelect.value;
+    setEquippedSpecialAbility(abilitySelect.value);
+    saveInterfaceData();
+  });
+  document.getElementById("special-ability-button").addEventListener("click", activateSpecialAbility);
   document.getElementById("sound-setting").addEventListener("change", (event) => {
     interfaceData.settings.sound = event.target.checked;
     saveInterfaceData();
@@ -770,6 +782,8 @@ function applyCustomization() {
   document.getElementById("effects-volume-value").textContent = `${Math.round(interfaceData.settings.sfxVolume * 100)}%`;
   document.getElementById("music-volume-value").textContent = `${Math.round(interfaceData.settings.musicVolume * 100)}%`;
   document.getElementById("effects-intensity-value").textContent = `${Math.round(interfaceData.settings.effectsIntensity * 100)}%`;
+  const abilitySelect = document.getElementById("special-ability-select");
+  if (abilitySelect) abilitySelect.value = interfaceData.settings.specialAbility;
   document.body.classList.toggle("colorblind-mode", interfaceData.settings.colorblind);
   document.body.classList.toggle("reduced-motion", interfaceData.settings.reducedMotion);
 }
@@ -886,6 +900,7 @@ function handleResultClick(event) {
 
 function pauseGame() {
   paused = true;
+  updateSpecialAbilityStatus();
   settingsReturnScreen = "pause-panel";
   renderSettings();
   showScreen("pause-panel");
@@ -894,12 +909,14 @@ function pauseGame() {
 function resumeGame() {
   paused = false;
   gameActive = true;
+  updateSpecialAbilityStatus();
   showScreen("game-shell");
 }
 
 function showLevelComplete(previousScore, nextLevel) {
   gameOver = false;
   paused = true;
+  updateSpecialAbilityStatus();
   const earned = Math.max(1, Math.min(3, lives + (score - previousScore > 500 ? 1 : 0)));
   document.getElementById("level-result-title").textContent = campaignComplete ? "Campaign Complete" : `Level ${level} Complete`;
   document.getElementById("level-score").textContent = (score - previousScore).toLocaleString();
@@ -917,6 +934,7 @@ function showGameOver() {
   gameOver = true;
   paused = true;
   gameActive = false;
+  updateSpecialAbilityStatus();
   interfaceData.stats.bestScore = Math.max(interfaceData.stats.bestScore, score);
   if (activeMode === "campaign" || activeMode === "endless") {
     interfaceData.save = { mode: activeMode, level, score, lives };
