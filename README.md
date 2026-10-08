@@ -1,11 +1,62 @@
-# Super-Basic-Brick-Bounce-Game
+# VECTOR BREAK
 
-Use the arrow keys or A/D to move the paddle. Space launches or releases a magnet-caught ball, F fires while the laser paddle is active, P pauses, and R restarts.
+**Crimson Arcade** — a local-first brick-breaker with evolving enemy tactics, ten handcrafted levels, and a three-phase boss finale.
 
-Choose Campaign, Classic Arcade, Endless, Time Attack, Boss Rush, Survival, Daily Challenge, Zen, or Local Co-op from the mode selector. Campaign spans 50 levels across five worlds; every tenth level is a boss encounter with a world-specific attack pattern and reward. Completing level 50 unlocks Endless mode in the selector.
+## Play
 
-Clear all destructible bricks and invaders to advance. Indestructible bricks change the ball's route but are obstacles, not level objectives. Brick and enemy types have different health and behaviors; falling power-ups are identified by both their color and shape. Active timed power-ups and their remaining durations appear below the game. Time Attack adds 15 seconds for each cleared wave. The Daily Challenge uses a date-based deterministic layout. Zen mode has no enemy attacks or life loss.
+Serve the repository over HTTP (service workers and installation require `localhost` or HTTPS):
 
-In Local Co-op, Player 1 controls the left paddle with the arrow keys and Player 2 controls the right paddle with A/D.
+```sh
+python3 -m http.server 8000
+```
 
-The main menu includes mode selection, continue, customization, achievements, statistics, settings, and full-screen controls. Interface settings and progress are saved locally. In-game, use Pause or P to open the pause menu; results screens offer next level, retry, or return to the menu.
+Open <http://localhost:8000>. The game has no build step. Campaign progress, best score, settings, achievements, and unlocks are stored in the browser. Once loaded, the optional PWA shell is available offline.
+
+## Controls
+
+| Input | Action |
+| --- | --- |
+| Left / Right arrows or A / D | Move the paddle |
+| Mouse movement or touch drag | Aim the paddle |
+| Space or **Launch** | Launch or release a caught ball |
+| P, Escape, or **Pause** | Pause or resume |
+| R | Restart |
+| F | Fire while Laser Paddle is active |
+| Controller left stick / D-pad | Move the paddle |
+| Controller A / Start | Launch / pause |
+
+In Local Co-op, Player 1 uses the arrows and Player 2 uses A/D. Mouse or touch control targets the paddle on the corresponding half of the playfield.
+
+## Campaign
+
+The ten-level Crimson Sector introduces mechanics in stages instead of relying on speed increases:
+
+1. Basic brick rows and standard invaders.
+2. Scout formations and bonus bricks.
+3. Armored targets and split formations.
+4. Moving bricks and alternating enemy lines.
+5. Explosive bricks and a tighter enemy formation.
+6. Frozen bricks and splitter invaders.
+7. Regenerating bricks and phantoms.
+8. Portal bricks and shield generators.
+9. Chain reactions and a mixed elite formation.
+10. Armored and explosive targets alongside the three-phase Crimson boss. Defeating it unlocks Endless.
+
+The HUD tracks score, personal best, combo, lives, level, remaining targets, and objective progress. Paddle impact position aims the ball; enemy projectiles threaten the paddle but cannot damage bricks.
+
+## Other modes and features
+
+- Classic Arcade, Endless (unlocked by the campaign), Time Attack, Boss Rush, Survival, Daily Challenge, Zen, and Local Co-op.
+- Ten brick types, seven enemy types, ten collectible power-ups, locally saved achievements and statistics.
+- Four complete palettes plus a persistent custom color editor, contrast validation, and live animated theme preview.
+- Responsive pointer/touch input, keyboard and standard gamepad controls, fixed-step physics, and sub-stepped fast-ball collision checks.
+- Colorblind-friendly target markings, reduced motion, adjustable effects and audio, and automatic pause when the tab loses focus.
+- Optional installable PWA shell. Crimson Arcade uses nearly black scenery, white interface text, red highlights and glow, color-coded bricks, and distinctive special-target/power-up colors.
+
+## Screenshots
+
+Genuine browser screenshots are not currently included. Add captures such as `screenshots/main-menu.png` and `screenshots/campaign-gameplay.png` when available; do not substitute mockups.
+
+## Attribution and license
+
+This repository is a modified fork of [iherrick-mps/Super-Basic-Brick-Bounce-Game](https://github.com/iherrick-mps/Super-Basic-Brick-Bounce-Game). The applicable GNU Affero General Public License v3.0 and its notices are retained in [LICENSE](./LICENSE). The game uses locally implemented canvas graphics and synthesized audio; no third-party art or audio assets are bundled.

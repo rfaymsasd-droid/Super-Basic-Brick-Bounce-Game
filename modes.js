@@ -10,17 +10,26 @@ const MODE_NAMES = {
   coop: "Local Co-op"
 };
 
+const CAMPAIGN_LEVEL_COUNT = 10;
 const WORLDS = [
-  { name: "The Beginning", levels: "1–10", bricks: ["normal", "normal", "golden"], bossPattern: "spread" },
-  { name: "Neon City", levels: "11–20", bricks: ["moving", "moving", "frozen"], bossPattern: "aimed" },
-  { name: "The Red Zone", levels: "21–30", bricks: ["armored", "explosive", "armored"], bossPattern: "crossfire" },
-  { name: "Quantum Rift", levels: "31–40", bricks: ["portal", "frozen", "indestructible"], bossPattern: "rift" },
-  { name: "The Final Frontier", levels: "41–50", bricks: ["armored", "explosive", "portal", "golden", "chain", "moving"], bossPattern: "final" }
+  { name: "Crimson Sector", levels: "1–10", bossPattern: "spread" }
 ];
 
 function getCampaignBrickType(levelNumber, slot) {
-  const world = WORLDS[Math.min(Math.floor((levelNumber - 1) / 10), WORLDS.length - 1)];
-  return world.bricks[slot % world.bricks.length];
+  const typesByLevel = [
+    ["normal"],
+    ["normal", "golden"],
+    ["normal", "armored"],
+    ["normal", "moving"],
+    ["normal", "explosive"],
+    ["armored", "frozen"],
+    ["normal", "regenerating"],
+    ["armored", "portal"],
+    ["chain", "moving", "explosive"],
+    ["armored", "explosive", "golden"]
+  ];
+  const types = typesByLevel[Math.min(Math.max(0, levelNumber - 1), typesByLevel.length - 1)];
+  return types[slot % types.length];
 }
 
 const BOSS_ATTACKS = {
@@ -60,7 +69,7 @@ function getModeName(mode) {
 
 function getWorldName() {
   if (activeMode !== "campaign") return activeMode === "daily" ? `Daily · ${new Date().toISOString().slice(0, 10)}` : "";
-  return `${WORLDS[Math.min(Math.floor((level - 1) / 10), 4)].name} · ${level}/50`;
+  return `${WORLDS[0].name} · ${Math.min(level, CAMPAIGN_LEVEL_COUNT)}/${CAMPAIGN_LEVEL_COUNT}`;
 }
 
 function getModeLives() {
@@ -78,9 +87,7 @@ function initializeModeLevel() {
   invaderBullets = [];
   invaderFireTimer = 0;
   invaderDirection = 1;
-  gravityField = activeMode === "campaign" && level >= 31 && level <= 40
-    ? { x: WIDTH / 2, y: 260, radius: 190 }
-    : null;
+  gravityField = null;
 
   switch (activeMode) {
     case "classic":
@@ -112,15 +119,14 @@ function initializeModeLevel() {
       invaders = makeInvaders(level);
       break;
   }
+  objectiveBrickTotal = remainingBrickTargets();
+  objectiveInvaderTotal = invaders.length;
   updateStatus();
 }
 
 function makeBossInvader(bossLevel) {
-  const worldIndex = activeMode === "campaign"
-    ? Math.min(Math.floor((bossLevel - 1) / 10), WORLDS.length - 1)
-    : (bossLevel - 1) % WORLDS.length;
-  const world = WORLDS[worldIndex];
-  const health = 24 + Math.floor(bossLevel / 10) * 4;
+  const attackPatterns = Object.keys(BOSS_ATTACKS);
+  const health = activeMode === "campaign" ? 18 : 24 + Math.floor(bossLevel / 10) * 4;
   return {
     x: WIDTH / 2 - 38,
     y: 92,
@@ -131,7 +137,9 @@ function makeBossInvader(bossLevel) {
     maxHealth: health,
     fireTimer: 0,
     phase: 1,
-    attackPattern: world.bossPattern,
+    attackPattern: activeMode === "campaign"
+      ? WORLDS[0].bossPattern
+      : attackPatterns[(bossLevel - 1) % attackPatterns.length],
     intangible: false
   };
 }
@@ -157,11 +165,11 @@ function drawBossHealth() {
   if (!boss) return;
   const width = 420;
   const x = (WIDTH - width) / 2;
-  ctx.fillStyle = "#32152c";
+  ctx.fillStyle = gameTheme.surface;
   ctx.fillRect(x, 24, width, 12);
-  ctx.fillStyle = "#ff4de1";
+  ctx.fillStyle = gameTheme.accent;
   ctx.fillRect(x, 24, width * boss.health / boss.maxHealth, 12);
-  ctx.strokeStyle = "white";
+  ctx.strokeStyle = "#ff7c84";
   ctx.strokeRect(x, 24, width, 12);
   ctx.fillStyle = "white";
   ctx.font = "bold 14px sans-serif";
@@ -178,12 +186,14 @@ function areModeObjectivesComplete() {
 
 function advanceModeLevel() {
   saveLevelProgress();
-  if (activeMode === "campaign" && level === 50) {
+  if (activeMode === "campaign" && level === CAMPAIGN_LEVEL_COUNT) {
     endlessUnlocked = true;
     saveEndlessUnlocked();
     setEndlessOptionState();
     campaignComplete = true;
     recordCampaignComplete();
+    interfaceData.save = { mode: "endless", level: 1, score, lives };
+    saveInterfaceData();
     started = false;
     updateStatus();
     showLevelComplete(levelStartScore, null);

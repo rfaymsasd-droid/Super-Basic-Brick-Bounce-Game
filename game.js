@@ -64,6 +64,21 @@ let campaignComplete = false;
 let dailyComplete = false;
 let gravityField = null;
 let levelStartScore = 0;
+let paddleImpact = 0;
+let impactPaddle = paddle;
+let cameraShake = 0;
+let paddleTargetX = paddle.x;
+let secondPaddleTargetX = secondPaddle.x;
+let objectiveBrickTotal = 0;
+let objectiveInvaderTotal = 0;
+const backgroundStars = Array.from({ length: 56 }, (_, index) => ({
+  x: (index * 167 + 47) % WIDTH,
+  y: (index * 97 + 31) % HEIGHT,
+  radius: index % 5 === 0 ? 1.5 : 0.8,
+  speed: 0.15 + index % 4 * 0.08
+}));
+const statusCounters = new WeakMap();
+const gamepadButtonState = new Map();
 
 const keys = {};
 
@@ -77,10 +92,13 @@ function unlockAudio() {
 
 document.addEventListener("keydown", function (event) {
   const key = event.key.toLowerCase();
+  const interactiveFocus = event.target.closest?.("button, input, select, textarea, a");
+  if (interactiveFocus && event.code !== "Escape") return;
   keys[key] = true;
   if (!event.repeat) unlockAudio();
 
   if (event.code === "Space") {
+    if (event.target !== canvas && event.target !== document.body) return;
     event.preventDefault();
     if (!event.repeat && !paused && !gameOver && gameActive) {
       recordLaunch();
@@ -90,7 +108,7 @@ document.addEventListener("keydown", function (event) {
   } else if (key === "r" && !event.repeat && (gameActive || gameOver)) {
     resetGame();
     beginGame(false);
-  } else if (key === "p" && !event.repeat && !gameOver && gameActive) {
+  } else if ((key === "p" || key === "escape") && !event.repeat && !gameOver && gameActive) {
     if (paused) resumeGame();
     else pauseGame();
   }
@@ -103,12 +121,47 @@ document.addEventListener("keydown", function (event) {
 document.addEventListener("keyup", function (event) {
   keys[event.key.toLowerCase()] = false;
 });
+document.addEventListener("click", function () {
+  unlockAudio();
+  updateMusic();
+});
 
-function update() {
-  if (!gameActive || paused || gameOver) {
+canvas.addEventListener("pointerdown", (event) => {
+  canvas.focus({ preventScroll: true });
+  canvas.setPointerCapture(event.pointerId);
+  updatePointerPaddle(event);
+});
+canvas.addEventListener("pointermove", (event) => {
+  if (event.pointerType === "mouse" || event.buttons > 0 || event.pressure > 0) updatePointerPaddle(event);
+});
+canvas.addEventListener("pointerup", (event) => {
+  if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+});
+canvas.addEventListener("pointercancel", (event) => {
+  if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+});
+
+function updatePointerPaddle(event) {
+  const bounds = canvas.getBoundingClientRect();
+  if (!bounds.width) return;
+  const canvasX = Math.max(0, Math.min(WIDTH, (event.clientX - bounds.left) * WIDTH / bounds.width));
+  if (activeMode === "coop") {
+    if (canvasX < WIDTH / 2) {
+      paddleTargetX = Math.max(0, Math.min(WIDTH / 2 - paddle.width, canvasX - paddle.width / 2));
+    } else {
+      secondPaddleTargetX = Math.max(WIDTH / 2, Math.min(WIDTH - secondPaddle.width, canvasX - secondPaddle.width / 2));
+    }
     return;
   }
+  paddleTargetX = Math.max(0, Math.min(WIDTH - paddle.width, canvasX - paddle.width / 2));
+}
 
+function update() {
+  if (!gameActive || gameOver) return;
+  updateGamepad();
+  if (paused) return;
+
+  updateGameEffects();
   movePaddle();
   if (ballAttached) {
     positionBall();
@@ -131,15 +184,8 @@ function update() {
   for (let index = balls.length - 1; index >= 0; index -= 1) {
     const targetBall = balls[index];
     if (targetBall.caught) continue;
-    moveBall(targetBall);
-    bounceOffWalls(targetBall);
-    for (const currentPaddle of getPaddles()) {
-      bounceOffPaddle(targetBall, currentPaddle);
-      if (targetBall.caught) break;
-    }
+    advanceBallWithCollisionChecks(targetBall);
     if (targetBall.caught) continue;
-    bounceOffBricks(targetBall);
-    bounceOffInvaders(targetBall);
     if (targetBall.y > HEIGHT) {
       balls.splice(index, 1);
       recordMiss();
@@ -168,20 +214,70 @@ function update() {
   updateStatus();
 }
 
+function advanceBallWithCollisionChecks(targetBall) {
+  const speed = Math.max(Math.abs(targetBall.vx), Math.abs(targetBall.vy)) *
+    (activeEffects.slow ? 0.55 : targetBall.slowTimer > 0 ? 0.65 : 1);
+  const steps = Math.max(1, Math.ceil(speed / Math.max(2, Math.min(targetBall.width, targetBall.height) / 2)));
+  for (let step = 0; step < steps; step += 1) {
+    moveBall(targetBall, 1 / steps);
+    bounceOffWalls(targetBall);
+    for (const currentPaddle of getPaddles()) {
+      bounceOffPaddle(targetBall, currentPaddle);
+      if (targetBall.caught) return;
+    }
+    bounceOffBricks(targetBall);
+    bounceOffInvaders(targetBall);
+    if (targetBall.y > HEIGHT) return;
+  }
+}
+
+function updateGamepad() {
+  const gamepads = window.navigator?.getGamepads?.();
+  if (!gamepads) return;
+  for (const gamepad of gamepads) {
+    if (!gamepad) continue;
+    const axis = gamepad.axes[0] || 0;
+    const dpadLeft = Boolean(gamepad.buttons[14]?.pressed);
+    const dpadRight = Boolean(gamepad.buttons[15]?.pressed);
+    const move = Math.abs(axis) > 0.18 ? axis : dpadRight ? 1 : dpadLeft ? -1 : 0;
+    if (activeMode === "coop") {
+      secondPaddleTargetX += move * paddle.speed;
+    } else {
+      paddleTargetX += move * paddle.speed;
+    }
+    const launchPressed = Boolean(gamepad.buttons[0]?.pressed);
+    const pausePressed = Boolean(gamepad.buttons[9]?.pressed);
+    const previous = gamepadButtonState.get(gamepad.index) || { launch: false, pause: false };
+    if (launchPressed && !previous.launch && gameActive && !paused && !gameOver) {
+      recordLaunch();
+      started = true;
+      launchBall();
+    }
+    if (pausePressed && !previous.pause && gameActive && !gameOver) {
+      if (paused) resumeGame();
+      else pauseGame();
+    }
+    gamepadButtonState.set(gamepad.index, { launch: launchPressed, pause: pausePressed });
+  }
+}
+
 function movePaddle() {
   const speed = paddle.speed * (activeEffects.slow ? 0.7 : 1);
   if (activeMode === "coop") {
-    if (keys["arrowleft"]) paddle.x -= speed;
-    if (keys["arrowright"]) paddle.x += speed;
-    if (keys["a"]) secondPaddle.x -= speed;
-    if (keys["d"]) secondPaddle.x += speed;
-    paddle.x = Math.max(0, Math.min(WIDTH / 2 - paddle.width, paddle.x));
-    secondPaddle.x = Math.max(WIDTH / 2, Math.min(WIDTH - secondPaddle.width, secondPaddle.x));
+    if (keys["arrowleft"]) paddleTargetX -= speed;
+    if (keys["arrowright"]) paddleTargetX += speed;
+    if (keys["a"]) secondPaddleTargetX -= speed;
+    if (keys["d"]) secondPaddleTargetX += speed;
+    paddleTargetX = Math.max(0, Math.min(WIDTH / 2 - paddle.width, paddleTargetX));
+    secondPaddleTargetX = Math.max(WIDTH / 2, Math.min(WIDTH - secondPaddle.width, secondPaddleTargetX));
+    paddle.x += (paddleTargetX - paddle.x) * 0.72;
+    secondPaddle.x += (secondPaddleTargetX - secondPaddle.x) * 0.72;
     return;
   }
-  if (keys["arrowleft"] || keys["a"]) paddle.x -= speed;
-  if (keys["arrowright"] || keys["d"]) paddle.x += speed;
-  paddle.x = Math.max(0, Math.min(WIDTH - paddle.width, paddle.x));
+  if (keys["arrowleft"] || keys["a"]) paddleTargetX -= speed;
+  if (keys["arrowright"] || keys["d"]) paddleTargetX += speed;
+  paddleTargetX = Math.max(0, Math.min(WIDTH - paddle.width, paddleTargetX));
+  paddle.x += (paddleTargetX - paddle.x) * 0.72;
 }
 
 function positionBall() {
@@ -211,7 +307,7 @@ function launchBall() {
   }
 }
 
-function moveBall(targetBall) {
+function moveBall(targetBall, distanceFraction = 1) {
   const speedFactor = activeEffects.slow ? 0.55 : targetBall.slowTimer > 0 ? 0.65 : 1;
   if (interfaceData.customization.trail !== "none") {
     targetBall.trail ||= [];
@@ -223,13 +319,17 @@ function moveBall(targetBall) {
     const dy = gravityField.y - (targetBall.y + targetBall.height / 2);
     const distance = Math.hypot(dx, dy);
     if (distance < gravityField.radius && distance > 0) {
-      targetBall.vx += dx / distance * 0.035;
-      targetBall.vy += dy / distance * 0.035;
+      targetBall.vx += dx / distance * 0.035 * distanceFraction;
+      targetBall.vy += dy / distance * 0.035 * distanceFraction;
     }
   }
-  targetBall.x += targetBall.vx * speedFactor;
-  targetBall.y += targetBall.vy * speedFactor;
+  targetBall.x += targetBall.vx * speedFactor * distanceFraction;
+  targetBall.y += targetBall.vy * speedFactor * distanceFraction;
 }
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && gameActive && !paused && !gameOver) pauseGame();
+});
 
 function moveInvaders() {
   if (invaders.length === 0) {
@@ -237,14 +337,16 @@ function moveInvaders() {
   }
 
   if (activeMode === "classic" || activeMode === "zen") return;
-  const speed = (0.7 + Math.min(level * 0.08, 1.2)) * (activeEffects.slow ? 0.55 : 1);
+  const speed = 0.9 * (activeEffects.slow ? 0.55 : 1);
   const leftEdge = Math.min(...invaders.map((invader) => invader.x)) + invaderDirection * speed;
   const rightEdge = Math.max(...invaders.map((invader) => invader.x + invader.width)) + invaderDirection * speed;
 
   if (leftEdge < 18 || rightEdge > WIDTH - 18) {
     invaderDirection *= -1;
-    for (const invader of invaders) {
-      invader.y += 14;
+    if (!invaders.some((invader) => invader.type === "boss")) {
+      for (const invader of invaders) {
+        invader.y += 14;
+      }
     }
   }
 
@@ -258,7 +360,7 @@ function moveInvaders() {
   const boss = invaders.find((invader) => invader.type === "boss");
   const fireInterval = boss
     ? boss.phase === 1 ? 75 : boss.phase === 2 ? 50 : 32
-    : Math.max(28, 90 - level * 5);
+    : Math.max(66, 90 - level * 2);
   if (invaderFireTimer >= fireInterval) {
     invaderFireTimer = 0;
     const shooter = boss && Math.random() < 0.45
@@ -285,7 +387,6 @@ function moveInvaders() {
           speed: INVADER_BULLET_SPEED,
           vx,
           vy,
-          electric: activeMode === "campaign" && level >= 11 && level <= 20 && Math.random() < 0.35
         });
       }
     }
@@ -342,6 +443,8 @@ function loseLife() {
   shockwaveTimer = 0;
   paddle.width = 72;
   secondPaddle.width = 72;
+  paddleTargetX = Math.max(0, Math.min(WIDTH - paddle.width, paddle.x));
+  secondPaddleTargetX = Math.max(WIDTH / 2, Math.min(WIDTH - secondPaddle.width, secondPaddle.x));
   updateStatus();
   if (lives === 0) {
     showGameOver();
@@ -384,48 +487,68 @@ function saveHighScore() {
 }
 
 function draw() {
-  ctx.fillStyle = "black";
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  if (interfaceData.settings.motionBlur && interfaceData.settings.effectsIntensity > 0 && !interfaceData.settings.reducedMotion && started && !paused && !gameOver) {
+    const blurAlpha = 0.42 * interfaceData.settings.effectsIntensity;
+    ctx.fillStyle = `rgba(0, 0, 0, ${blurAlpha})`;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  } else {
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
+    ctx.fillStyle = gameTheme.background;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  }
 
-  ctx.fillStyle = "white";
+  ctx.save();
+  if (interfaceData.settings.cameraShake && !interfaceData.settings.reducedMotion && cameraShake > 0) {
+    const shake = cameraShake * interfaceData.settings.effectsIntensity;
+    ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+  }
+  drawGameBackground();
   ctx.fillStyle = getCustomizationColor("paddle");
-  drawSquircle(paddle.x, paddle.y, paddle.width, paddle.height);
-  if (activeMode === "coop") drawSquircle(secondPaddle.x, secondPaddle.y, secondPaddle.width, secondPaddle.height);
+  drawPaddle(paddle);
+  if (activeMode === "coop") drawPaddle(secondPaddle);
   for (const targetBall of balls) {
-    const trailColor = interfaceData.customization.trail === "none"
+    const trailColor = interfaceData.settings.reducedMotion || interfaceData.customization.trail === "none"
       ? null
-      : interfaceData.customization.trail === "spark" ? "#ffe45e"
-        : interfaceData.customization.trail === "ember" ? "#ff704e" : "#4de3ff";
+      : interfaceData.customization.trail === "spark" ? gameTheme.accentSecondary
+      : interfaceData.customization.trail === "ember" ? gameTheme.accent : gameTheme.accentSecondary;
     if (trailColor && targetBall.trail) {
       targetBall.trail.forEach((point, index) => {
-        ctx.globalAlpha = (index + 1) / targetBall.trail.length * 0.25;
+        ctx.globalAlpha = (index + 1) / targetBall.trail.length * 0.18 * interfaceData.settings.effectsIntensity;
         ctx.fillStyle = trailColor;
+        ctx.shadowColor = trailColor;
+        ctx.shadowBlur = 4;
         ctx.beginPath();
         ctx.arc(point.x, point.y, targetBall.width * (index + 1) / targetBall.trail.length / 2, 0, Math.PI * 2);
         ctx.fill();
       });
       ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
     }
     ctx.fillStyle = targetBall.piercing ? "#ff8a3d" : getCustomizationColor("ball");
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.shadowBlur = 7 * interfaceData.settings.effectsIntensity;
     drawSquircle(targetBall.x, targetBall.y, targetBall.width, targetBall.height);
+    ctx.shadowBlur = 0;
   }
   drawBricks();
   drawInvaders();
   drawEnemyDetails();
+  drawGameParticles();
   drawInvaderBullets();
   drawPowerUps();
   drawBossHealth();
   if (gravityField) {
-    ctx.strokeStyle = "rgba(152, 108, 255, 0.6)";
+    ctx.strokeStyle = `${gameTheme.accentSecondary}99`;
     ctx.beginPath();
     ctx.arc(gravityField.x, gravityField.y, gravityField.radius, 0, Math.PI * 2);
     ctx.stroke();
   }
+  ctx.restore();
 
   if (paused || gameOver || !started) {
     ctx.fillStyle = "rgba(0, 0, 0, 0.72)";
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
-    ctx.fillStyle = "white";
+    ctx.fillStyle = gameTheme.text;
     ctx.textAlign = "center";
     ctx.font = "bold 42px sans-serif";
     const title = gameOver ? drawModeOverlayTitle() : paused ? "PAUSED" : "READY";
@@ -440,47 +563,147 @@ function draw() {
   }
 }
 
+function drawPaddle(targetPaddle) {
+  const scale = paddleImpact > 0 && impactPaddle === targetPaddle ? 1 + paddleImpact / 90 : 1;
+  ctx.save();
+  ctx.translate(targetPaddle.x + targetPaddle.width / 2, targetPaddle.y + targetPaddle.height / 2);
+  ctx.scale(1, scale);
+  ctx.translate(-(targetPaddle.x + targetPaddle.width / 2), -(targetPaddle.y + targetPaddle.height / 2));
+  ctx.shadowColor = getCustomizationColor("paddle");
+  ctx.shadowBlur = interfaceData.settings.reducedMotion ? 0 : 8 * interfaceData.settings.effectsIntensity;
+  drawSquircle(targetPaddle.x, targetPaddle.y, targetPaddle.width, targetPaddle.height);
+  ctx.restore();
+}
+
 function drawInvaders() {
   for (const invader of invaders) {
     const { x, y, width, height } = invader;
-    const colors = { scout: "#64e8ff", tank: "#ff9f43", sniper: "#ff5757", phantom: "#a88bff", "shield-generator": "#65ffcc", splitter: "#c4ff5c", boss: "#ff4de1" };
-    ctx.fillStyle = colors[invader.type] || "white";
+    const colors = {
+      standard: gameTheme.enemy,
+      scout: gameTheme.accentSecondary,
+      tank: gameTheme.enemy,
+      sniper: gameTheme.projectile,
+      phantom: gameTheme.accentTertiary,
+      "shield-generator": gameTheme.accentSecondary,
+      splitter: gameTheme.accentTertiary,
+      boss: gameTheme.accent
+    };
+    const idleOffset = interfaceData.settings.reducedMotion ? 0 : Math.sin(movingTick / 14 + x * 0.02) * 1.1;
+    ctx.fillStyle = invader.flashTimer > 0 ? "#ffffff" : colors[invader.type] || "white";
     ctx.globalAlpha = invader.intangible ? 0.25 : 1;
-    ctx.fillRect(x + 7, y, width - 14, 5);
-    ctx.fillRect(x + 3, y + 5, width - 6, 8);
-    ctx.fillRect(x, y + 11, width, 5);
-    ctx.fillRect(x + 5, y + 16, 5, height - 16);
-    ctx.fillRect(x + width - 10, y + 16, 5, height - 16);
-    ctx.fillStyle = "black";
+    ctx.fillRect(x + 7, y + idleOffset, width - 14, 5);
+    ctx.fillRect(x + 3, y + 5 + idleOffset, width - 6, 8);
+    ctx.fillRect(x, y + 11 + idleOffset, width, 5);
+    ctx.fillRect(x + 5, y + 16 + idleOffset, 5, height - 16);
+    ctx.fillRect(x + width - 10, y + 16 + idleOffset, 5, height - 16);
+    ctx.fillStyle = gameTheme.background;
     ctx.fillRect(x + 8, y + 7, 3, 3);
     ctx.fillRect(x + width - 11, y + 7, 3, 3);
+    if (interfaceData.settings.colorblind) {
+      const symbols = { standard: "I", scout: "S", tank: "T", sniper: "N", phantom: "P", "shield-generator": "G", splitter: "X", boss: "B" };
+      const markerWidth = invader.type === "boss" ? 13 : 9;
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = gameTheme.background;
+      ctx.fillRect(x + width - markerWidth, y - 3, markerWidth, 9);
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + width - markerWidth, y - 3, markerWidth, 9);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 7px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(symbols[invader.type] || "I", x + width - markerWidth / 2, y + 1);
+    }
     ctx.globalAlpha = 1;
   }
 }
 
 function drawInvaderBullets() {
   for (const bullet of invaderBullets) {
-    ctx.fillStyle = bullet.electric ? "#4de3ff" : "white";
+    ctx.fillStyle = bullet.electric ? gameTheme.accentSecondary : gameTheme.projectile;
     ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
     if (bullet.electric) {
-      ctx.strokeStyle = "#b5f7ff";
+      ctx.strokeStyle = gameTheme.text;
       ctx.strokeRect(bullet.x - 2, bullet.y - 2, bullet.width + 4, bullet.height + 4);
     }
   }
 }
 
 function updateStatus() {
-  document.getElementById("level").textContent = level;
-  document.getElementById("lives").textContent = activeMode === "zen" ? "∞" : lives;
-  document.getElementById("score").textContent = score.toLocaleString();
-  document.getElementById("high-score").textContent = highScore.toLocaleString();
-  document.getElementById("combo").textContent = `x${combo}`;
-  document.getElementById("bricks-left").textContent = remainingBrickTargets();
-  document.getElementById("invaders-left").textContent = invaders.length;
+  updateStatusCounter("level", level);
+  updateStatusCounter("lives", activeMode === "zen" ? "∞" : lives);
+  updateStatusCounter("score", score, (value) => Math.round(value).toLocaleString());
+  updateStatusCounter("high-score", highScore, (value) => Math.round(value).toLocaleString());
+  updateStatusCounter("combo", combo, (value) => `x${Math.round(value)}`);
+  updateStatusCounter("bricks-left", remainingBrickTargets());
+  updateStatusCounter("invaders-left", invaders.length);
   document.getElementById("mode").textContent = getModeName(activeMode);
   document.getElementById("world").textContent = getWorldName();
   document.getElementById("timer").textContent = activeMode === "time_attack" ? `${Math.ceil(modeTimer / 60)}s` : "";
+  const remainingBricks = remainingBrickTargets();
+  const remainingInvaders = invaders.length;
+  const brickProgress = objectiveBrickTotal ? (objectiveBrickTotal - remainingBricks) / objectiveBrickTotal : 1;
+  const invaderProgress = objectiveInvaderTotal ? (objectiveInvaderTotal - remainingInvaders) / objectiveInvaderTotal : 1;
+  document.getElementById("bricks-progress-bar").style.width = `${Math.max(0, Math.min(1, brickProgress)) * 100}%`;
+  document.getElementById("invaders-progress-bar").style.width = `${Math.max(0, Math.min(1, invaderProgress)) * 100}%`;
   updatePowerUpStatus();
+}
+
+function updateStatusCounter(id, target, format = (value) => String(value)) {
+  const element = document.getElementById(id);
+  if (typeof target !== "number") {
+    statusCounters.delete(element);
+    element.textContent = target;
+    return;
+  }
+  let animation = statusCounters.get(element);
+  if (!animation) {
+    animation = { current: target, from: target, target, start: performance.now() };
+    statusCounters.set(element, animation);
+  } else if (animation.target !== target) {
+    animation.from = animation.current;
+    animation.target = target;
+    animation.start = performance.now();
+  }
+  const progress = Math.min(1, (performance.now() - animation.start) / 180);
+  const eased = 1 - (1 - progress) ** 3;
+  animation.current = animation.from + (animation.target - animation.from) * eased;
+  element.textContent = format(animation.current);
+}
+
+function drawGameBackground() {
+  const gradient = ctx.createLinearGradient(0, 0, 0, HEIGHT);
+  gradient.addColorStop(0, gameTheme.background);
+  gradient.addColorStop(1, gameTheme.surface);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  for (const star of backgroundStars) {
+    const y = (star.y + (interfaceData.settings.reducedMotion ? 0 : movingTick * star.speed)) % HEIGHT;
+    ctx.globalAlpha = 0.18 + (star.radius > 1 ? 0.12 : 0);
+    ctx.fillStyle = gameTheme.accentSecondary;
+    ctx.fillRect(star.x, y, star.radius, star.radius);
+  }
+  ctx.globalAlpha = 1;
+  if (interfaceData.settings.animatedGrid && !interfaceData.settings.reducedMotion) {
+    ctx.strokeStyle = `${gameTheme.accent}18`;
+    ctx.lineWidth = 1;
+    const gridOffset = movingTick % 36;
+    for (let y = gridOffset; y < HEIGHT; y += 36) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(WIDTH, y);
+      ctx.stroke();
+    }
+  }
+}
+
+function drawGameParticles() {
+  for (const particle of gameParticles) {
+    ctx.globalAlpha = particle.life / particle.maxLife * 0.72;
+    ctx.fillStyle = particle.color;
+    ctx.fillRect(particle.x, particle.y, particle.size, particle.size);
+  }
+  ctx.globalAlpha = 1;
 }
 
 function remainingBrickTargets() {
@@ -524,7 +747,9 @@ function frame(now) {
     leftover = leftover - STEP;
   }
 
+  updateMusic();
   draw();
+  if (document.hidden && gameActive && !paused && !gameOver) pauseGame();
   requestAnimationFrame(frame);
 }
 
@@ -543,6 +768,8 @@ function resetGame() {
   invaderFireTimer = 0;
   paddle.x = WIDTH / 2 - paddle.width / 2;
   secondPaddle.x = WIDTH / 2 - secondPaddle.width / 2;
+  paddleTargetX = paddle.x;
+  secondPaddleTargetX = secondPaddle.x;
   level = 1;
   score = 0;
   combo = 0;
@@ -553,10 +780,16 @@ function resetGame() {
   shieldCharges = 0;
   laserCooldown = 0;
   shockwaveTimer = 0;
+  cameraShake = 0;
+  paddleImpact = 0;
+  impactPaddle = paddle;
+  gameParticles = [];
   movingTick = 0;
   gravityField = null;
   paddle.width = 72;
   secondPaddle.width = 72;
+  paddleTargetX = paddle.x;
+  secondPaddleTargetX = secondPaddle.x;
   started = false;
   ballAttached = true;
   balls = [ball];
@@ -569,6 +802,8 @@ function resetGame() {
   if (activeMode === "coop") {
     paddle.x = WIDTH / 4 - paddle.width / 2;
     secondPaddle.x = WIDTH * 3 / 4 - secondPaddle.width / 2;
+    paddleTargetX = paddle.x;
+    secondPaddleTargetX = secondPaddle.x;
   }
   initializeModeLevel();
   positionBall();

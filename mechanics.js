@@ -17,6 +17,136 @@ let shieldCharges = 0;
 let soundContext;
 let movingTick = 0;
 let laserCooldown = 0;
+let gameParticles = [];
+let musicNodes = [];
+let musicMode = "";
+let musicInterval = 0;
+let musicStep = 0;
+let musicVolumeApplied = -1;
+
+function playGameSound(kind) {
+  if (!interfaceData.settings.sound) return;
+  const AudioContextType = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextType) return;
+  soundContext ||= new AudioContextType();
+  if (soundContext.state === "suspended") soundContext.resume();
+  const notes = { wall: [260, 0.045], paddle: [440, 0.08], brick: [330, 0.06], enemy: [185, 0.09], powerup: [620, 0.1], destroy: [520, 0.11] };
+  const [frequency, volume] = notes[kind] || notes.brick;
+  const oscillator = soundContext.createOscillator();
+  const gain = soundContext.createGain();
+  oscillator.type = kind === "enemy" ? "triangle" : "sine";
+  oscillator.frequency.setValueAtTime(frequency, soundContext.currentTime);
+  oscillator.frequency.exponentialRampToValueAtTime(Math.max(100, frequency * 0.72), soundContext.currentTime + 0.09);
+  gain.gain.setValueAtTime(volume * interfaceData.settings.sfxVolume, soundContext.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, soundContext.currentTime + 0.12);
+  oscillator.connect(gain);
+  gain.connect(soundContext.destination);
+  oscillator.start();
+  oscillator.stop(soundContext.currentTime + 0.12);
+}
+
+function updateMusic() {
+  if (!interfaceData.settings.music || interfaceData.settings.musicVolume <= 0) {
+    stopMusic();
+    return;
+  }
+  if (!soundContext || soundContext.state === "suspended") return;
+  const boss = gameActive && invaders.some((invader) => invader.type === "boss");
+  const track = boss ? "boss" : gameActive ? "game" : "menu";
+  if (musicMode === track && musicVolumeApplied === interfaceData.settings.musicVolume) return;
+  stopMusic();
+  musicMode = track;
+  musicVolumeApplied = interfaceData.settings.musicVolume;
+  musicStep = 0;
+  playMusicNote();
+  musicInterval = setInterval(playMusicNote, 340);
+}
+
+function playMusicNote() {
+  if (!soundContext || !musicMode) return;
+  const tracks = {
+    menu: { root: 220, notes: [0, 4, 7, 11, 7, 4] },
+    game: { root: 164.81, notes: [0, 3, 7, 10, 7, 3] },
+    boss: { root: 110, notes: [0, 3, 5, 6, 3, 1] }
+  };
+  const track = tracks[musicMode];
+  const frequency = track.root * 2 ** (track.notes[musicStep % track.notes.length] / 12);
+  musicStep += 1;
+  const oscillator = soundContext.createOscillator();
+  const gain = soundContext.createGain();
+  const now = soundContext.currentTime;
+  oscillator.type = "triangle";
+  oscillator.frequency.value = frequency;
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.07 * interfaceData.settings.musicVolume, now + 0.025);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+  oscillator.connect(gain);
+  gain.connect(soundContext.destination);
+  oscillator.onended = () => {
+    oscillator.disconnect();
+    gain.disconnect();
+    musicNodes = musicNodes.filter((node) => node !== oscillator && node !== gain);
+  };
+  oscillator.start(now);
+  oscillator.stop(now + 0.29);
+  musicNodes.push(oscillator, gain);
+}
+
+function stopMusic() {
+  if (musicInterval) clearInterval(musicInterval);
+  musicInterval = 0;
+  for (const node of musicNodes) {
+    if (typeof node.stop === "function") {
+      try {
+        node.stop();
+      } catch (error) {
+        if (error.name !== "InvalidStateError") throw error;
+      }
+    }
+    node.disconnect();
+  }
+  musicNodes = [];
+  musicMode = "";
+  musicVolumeApplied = -1;
+}
+
+function spawnParticles(x, y, color, count = 5, force = 2) {
+  if (interfaceData.settings.reducedMotion || interfaceData.settings.effectsIntensity <= 0) return;
+  const intensity = interfaceData.settings.effectsIntensity;
+  count = Math.max(1, Math.round(count * intensity));
+  force *= intensity;
+  for (let index = 0; index < count; index += 1) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.5 + Math.random() * force;
+    gameParticles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: 1 + Math.random() * 2,
+      color,
+      life: 18 + Math.floor(Math.random() * 13),
+      maxLife: 31
+    });
+  }
+}
+
+function updateGameEffects() {
+  for (let index = gameParticles.length - 1; index >= 0; index -= 1) {
+    const particle = gameParticles[index];
+    particle.x += particle.vx;
+    particle.y += particle.vy;
+    particle.vx *= 0.97;
+    particle.vy *= 0.97;
+    particle.life -= 1;
+    if (particle.life <= 0) gameParticles.splice(index, 1);
+  }
+  for (const invader of invaders) {
+    if (invader.flashTimer > 0) invader.flashTimer -= 1;
+  }
+  if (paddleImpact > 0) paddleImpact -= 1;
+  if (cameraShake > 0) cameraShake *= 0.82;
+  if (cameraShake < 0.15) cameraShake = 0;
+}
 
 function dropPowerUp(x, y, chance = 0.12) {
   if (Math.random() >= chance) return;
@@ -48,6 +178,8 @@ function damageBrick(index, targetBall) {
     targetBall.vy = Math.sin(angle) * speed;
     return;
   }
+  spawnParticles(targetBall.x + targetBall.width / 2, targetBall.y + targetBall.height / 2, brick.type === "frozen" ? gameTheme.accentTertiary : gameTheme.brick, 3, 1.1);
+  playGameSound("brick");
   registerTargetHit(brick.type === "golden" ? 100 : 10);
   brick.health -= 1;
   if (brick.health > 0) {
@@ -60,6 +192,9 @@ function damageBrick(index, targetBall) {
 function destroyBrick(index) {
   const [brick] = bricks.splice(index, 1);
   if (!brick) return;
+  spawnParticles(brick.x + brick.width / 2, brick.y + brick.height / 2, brick.type === "golden" ? gameTheme.accentSecondary : gameTheme.brick, 10, 2.7);
+  cameraShake = Math.max(cameraShake, 1.4);
+  playGameSound("destroy");
   recordDestroyedBrick();
   dropPowerUp(brick.x + brick.width / 2, brick.y, 0.14);
   if (brick.type === "explosive") {
@@ -83,15 +218,21 @@ function destroyBrick(index) {
 function damageInvader(index, targetBall) {
   const invader = invaders[index];
   if (!invader || invader.intangible || (invader.type !== "shield-generator" && isInvaderShielded(invader))) return;
+  invader.flashTimer = 7;
+  spawnParticles(targetBall.x + targetBall.width / 2, targetBall.y + targetBall.height / 2, gameTheme.enemy, 4, 1.4);
+  playGameSound("enemy");
   invader.health -= 1;
   if (invader.health > 0) return;
   const [destroyed] = invaders.splice(index, 1);
+  spawnParticles(destroyed.x + destroyed.width / 2, destroyed.y + destroyed.height / 2, gameTheme.accent, destroyed.type === "boss" ? 24 : 12, 3.2);
+  cameraShake = Math.max(cameraShake, destroyed.type === "boss" ? 5 : 2.2);
   registerTargetHit(destroyed.type === "boss" ? 3000 : destroyed.type === "tank" ? 100 : 50);
   if (destroyed.type === "boss") {
     if (activeMode === "campaign" || activeMode === "boss_rush") lives += 1;
   }
   dropPowerUp(destroyed.x + destroyed.width / 2, destroyed.y, destroyed.type === "boss" ? 1 : 0.18);
   if (destroyed.type === "splitter") {
+    objectiveInvaderTotal += 2;
     for (let child = 0; child < 2; child += 1) {
       invaders.push({
         x: destroyed.x + child * 15,
@@ -192,6 +333,8 @@ function collectPowerUp(powerUp) {
     paddle.width = 120;
     if (activeMode === "coop") secondPaddle.width = 120;
     paddle.x = Math.min(paddle.x, activeMode === "coop" ? WIDTH / 2 - paddle.width : WIDTH - paddle.width);
+    paddleTargetX = paddle.x;
+    if (activeMode === "coop") secondPaddleTargetX = secondPaddle.x;
   } else if (powerUp.id === "slow") {
     setEffect("slow", powerUp.duration);
   } else if (powerUp.id === "double") {
@@ -304,7 +447,7 @@ function playPickupSound(id) {
   const pitch = POWER_UPS.findIndex((powerUp) => powerUp.id === id);
   oscillator.frequency.value = 320 + pitch * 38;
   oscillator.type = id === "life" ? "sine" : "triangle";
-  gain.gain.setValueAtTime(0.08, soundContext.currentTime);
+  gain.gain.setValueAtTime(0.08 * interfaceData.settings.sfxVolume, soundContext.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, soundContext.currentTime + 0.16);
   oscillator.connect(gain);
   gain.connect(soundContext.destination);
@@ -389,11 +532,11 @@ function drawPowerUps() {
     ctx.fillText(powerUp.name[0], powerUp.x + 12, powerUp.y + 16);
   }
   for (const shot of laserShots) {
-    ctx.fillStyle = "#df83ff";
+    ctx.fillStyle = gameTheme.accentSecondary;
     ctx.fillRect(shot.x, shot.y, shot.width, shot.height);
   }
   if (shieldCharges > 0) {
-    ctx.strokeStyle = "#65ffcc";
+    ctx.strokeStyle = gameTheme.accentSecondary;
     ctx.beginPath();
     ctx.arc(paddle.x + paddle.width / 2, paddle.y + 12, paddle.width / 2 + 8, Math.PI, Math.PI * 2);
     ctx.stroke();
@@ -409,14 +552,23 @@ function drawPowerUps() {
 
 function drawEnemyDetails() {
   for (const invader of invaders) {
-    const colors = { scout: "#64e8ff", tank: "#ff9f43", sniper: "#ff5757", phantom: "#a88bff", "shield-generator": "#65ffcc", splitter: "#c4ff5c", boss: "#ff4de1" };
+    const colors = {
+      standard: gameTheme.enemy,
+      scout: gameTheme.accentSecondary,
+      tank: gameTheme.enemy,
+      sniper: gameTheme.projectile,
+      phantom: gameTheme.accentTertiary,
+      "shield-generator": gameTheme.accentSecondary,
+      splitter: gameTheme.accentTertiary,
+      boss: gameTheme.accent
+    };
     ctx.fillStyle = colors[invader.type] || "white";
     if (invader.type === "boss") {
       ctx.fillRect(invader.x, invader.y - 5, invader.width * invader.health / invader.maxHealth, 3);
-      ctx.strokeStyle = "#ff4de1";
+      ctx.strokeStyle = gameTheme.accent;
       ctx.strokeRect(invader.x, invader.y, invader.width, invader.height);
     } else if (invader.type === "shield-generator") {
-      ctx.strokeStyle = "#65ffcc";
+      ctx.strokeStyle = gameTheme.accentSecondary;
       ctx.beginPath();
       ctx.arc(invader.x + invader.width / 2, invader.y + invader.height / 2, 8, 0, Math.PI * 2);
       ctx.stroke();
@@ -424,7 +576,7 @@ function drawEnemyDetails() {
       ctx.fillRect(invader.x + 2, invader.y - 3, (invader.width - 4) * invader.health / 3, 2);
     }
     if (invader.type !== "shield-generator" && isInvaderShielded(invader)) {
-      ctx.strokeStyle = "#65ffcc";
+      ctx.strokeStyle = gameTheme.accentSecondary;
       ctx.beginPath();
       ctx.arc(invader.x + invader.width / 2, invader.y + invader.height / 2, invader.width / 2 + 3, 0, Math.PI * 2);
       ctx.stroke();

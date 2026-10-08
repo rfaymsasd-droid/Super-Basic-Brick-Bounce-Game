@@ -1,0 +1,18 @@
+{
+  "name": "VECTOR BREAK — Crimson Arcade",
+  "short_name": "VECTOR BREAK",
+  "description": "A crimson arcade brick-breaker with ten handcrafted levels and a boss battle.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#090A0E",
+  "theme_color": "#090A0E",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

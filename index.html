@@ -3,21 +3,27 @@
   <head>
     <meta charset="UTF-8">
    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Block Breaker</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>VECTOR BREAK — Crimson Arcade</title>
+    <link rel="icon" href="./icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="./styles.css">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <meta name="theme-color" content="#090A0E">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
   </head>
   <body>
     <canvas id="menu-background" width="1440" height="900" aria-hidden="true"></canvas>
     <main id="app">
       <section id="main-menu" class="screen menu-screen" aria-labelledby="game-logo">
         <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
-        <p class="eyebrow">ARCADE CLASSICS REIMAGINED</p>
-        <h1 id="game-logo">BRICK<span>BOUNCE</span></h1>
-        <p class="menu-tagline">Break the pattern. Own the galaxy.</p>
+        <p class="eyebrow">CRIMSON ARCADE</p>
+        <h1 id="game-logo">VECTOR<span>BREAK</span></h1>
+        <p class="menu-tagline">Read the pattern. Break the line.</p>
         <nav class="main-menu-actions" aria-label="Main menu">
           <button class="primary-button" data-action="play">Play</button>
           <button id="continue-button" data-action="continue">Continue</button>
           <button data-action="modes">Modes</button>
+          <button data-action="themes">Themes</button>
           <button data-action="customize">Customize</button>
           <button data-action="achievements">Achievements</button>
           <button data-action="statistics">Statistics</button>
@@ -28,6 +34,31 @@
       </section>
 
       <div id="panel-root">
+        <section id="themes-screen" class="screen theme-overlay" aria-labelledby="themes-title" hidden>
+          <div class="theme-dialog" role="dialog" aria-modal="true" aria-labelledby="themes-title" aria-describedby="themes-description">
+            <button class="theme-close" type="button" data-action="theme-close" aria-label="Close appearance" data-autofocus>×</button>
+            <p class="eyebrow">MAKE IT YOURS</p>
+            <h2 id="themes-title">APPEARANCE</h2>
+            <p id="themes-description" class="theme-description">Customize your arcade experience.</p>
+            <div class="theme-live-preview">
+              <canvas id="theme-preview" width="720" height="210" aria-label="Animated preview of your selected game theme"></canvas>
+              <span class="preview-tag">LIVE PREVIEW</span>
+            </div>
+            <div id="theme-card-grid" class="theme-card-grid" aria-label="Choose a theme"></div>
+            <section class="custom-theme-editor" aria-labelledby="custom-theme-title">
+              <div class="custom-theme-heading">
+                <div><p class="eyebrow">YOUR PALETTE</p><h3 id="custom-theme-title">Custom Theme</h3></div>
+                <span id="theme-feedback" class="theme-feedback" role="status" aria-live="polite"></span>
+              </div>
+              <div id="custom-theme-fields" class="custom-theme-fields"></div>
+              <div class="custom-theme-actions">
+                <button id="save-custom-theme" class="primary-button" type="button">Save Custom Theme</button>
+                <button id="reset-custom-theme" type="button">Reset to Default</button>
+              </div>
+            </section>
+          </div>
+        </section>
+
         <section id="mode-screen" class="screen content-screen" hidden>
           <button class="back-button" data-action="back">← Main menu</button>
           <p class="eyebrow">CHOOSE YOUR CHALLENGE</p>
@@ -67,14 +98,23 @@
           <h2>Settings</h2>
           <div class="settings-list">
             <label><span>Sound effects</span><input id="sound-setting" type="checkbox" checked></label>
+            <label class="range-setting"><span>Effects volume <output id="effects-volume-value" for="effects-volume">70%</output></span><input id="effects-volume" type="range" min="0" max="1" step="0.05" value="0.7"></label>
+            <label><span>Music</span><input id="music-setting" type="checkbox" checked></label>
+            <label class="range-setting"><span>Music volume <output id="music-volume-value" for="music-volume">20%</output></span><input id="music-volume" type="range" min="0" max="1" step="0.05" value="0.2"></label>
             <label><span>Reduce motion</span><input id="motion-setting" type="checkbox"></label>
+            <label><span>Colorblind-friendly targets</span><input id="colorblind-setting" type="checkbox"></label>
+            <label class="range-setting"><span>Visual effects <output id="effects-intensity-value" for="effects-intensity">60%</output></span><input id="effects-intensity" type="range" min="0" max="1" step="0.1" value="0.6"></label>
+            <button id="settings-themes-button" type="button">Appearance &amp; Themes</button>
+            <label><span>Camera shake</span><input id="camera-shake-setting" type="checkbox"></label>
+            <label><span>Motion blur</span><input id="motion-blur-setting" type="checkbox"></label>
+            <label><span>Animated grid</span><input id="grid-setting" type="checkbox" checked></label>
             <button id="fullscreen-button" type="button">Full screen</button>
           </div>
         </section>
 
         <section id="game-shell" class="screen game-screen" hidden>
           <header class="game-header">
-            <div class="compact-logo">BRICK<span>BOUNCE</span></div>
+            <div class="compact-logo">VECTOR<span>BREAK</span></div>
             <div class="mode-controls">
               <label class="visually-hidden" for="mode-select">Game mode</label>
               <select id="mode-select">
@@ -89,13 +129,14 @@
                 <option value="coop">Local Co-op</option>
               </select>
               <button id="restart-mode" type="button">Restart</button>
+              <button id="launch-button" type="button" aria-label="Launch or release the ball">Launch</button>
               <button id="pause-button" type="button">Ⅱ Pause</button>
               <button id="game-fullscreen-button" type="button">Full screen</button>
             </div>
           </header>
           <div class="game-status" aria-live="polite">
             <span>Mode <strong id="mode">Campaign</strong></span>
-            <span>World <strong id="world">The Beginning · 1/50</strong></span>
+            <span>Sector <strong id="world">Crimson Sector · 1/10</strong></span>
             <span>Level <strong id="level">1</strong></span>
             <span>Lives <strong id="lives">3</strong></span>
             <span>Time <strong id="timer"></strong></span>
@@ -105,9 +146,13 @@
             <span>Bricks <strong id="bricks-left">0</strong></span>
             <span>Invaders <strong id="invaders-left">0</strong></span>
           </div>
-          <canvas id="game" width="900" height="650" aria-label="Brick breaker and space invaders game"></canvas>
+          <div class="objective-progress" aria-label="Objective progress">
+            <div><span>Bricks</span><div class="progress-track"><div id="bricks-progress-bar"></div></div></div>
+            <div><span>Invaders</span><div class="progress-track"><div id="invaders-progress-bar"></div></div></div>
+          </div>
+          <canvas id="game" width="900" height="650" tabindex="0" role="application" aria-label="Brick breaker and space invaders game" aria-describedby="game-instructions"></canvas>
           <p id="powerup-status" aria-live="polite">No active power-ups</p>
-          <p class="game-instructions">Move with arrows or A/D. Co-op: Player 1 uses arrows, Player 2 uses A/D. Space launches, F fires lasers, P pauses.</p>
+          <p id="game-instructions" class="game-instructions">Move with arrows, A/D, mouse, touch, or a controller. Co-op: Player 1 uses arrows, Player 2 uses A/D. Space or Launch releases the ball; P or Pause pauses. Controller: left stick/D-pad, A launches, Start pauses.</p>
         </section>
 
         <section id="pause-panel" class="screen dialog-screen" aria-labelledby="pause-title" hidden>
@@ -141,6 +186,7 @@
       </div>
     </main>
 
+   <script src="themes.js"></script>
    <script src="game.js"></script>
    <script src="bricks.js"></script>
    <script src="collisions.js"></script>

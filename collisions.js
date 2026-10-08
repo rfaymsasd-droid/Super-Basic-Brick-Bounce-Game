@@ -11,14 +11,20 @@ function bounceOffWalls(targetBall = ball) {
   if (targetBall.x < 0) {
     targetBall.x = 0;
     targetBall.vx = -targetBall.vx;
+    playGameSound("wall");
+    spawnParticles(targetBall.x, targetBall.y + targetBall.height / 2, gameTheme.accentSecondary, 2, 0.8);
   }
   if (targetBall.x + targetBall.width > WIDTH) {
     targetBall.x = WIDTH - targetBall.width;
     targetBall.vx = -targetBall.vx;
+    playGameSound("wall");
+    spawnParticles(targetBall.x + targetBall.width, targetBall.y + targetBall.height / 2, gameTheme.accentSecondary, 2, 0.8);
   }
   if (targetBall.y < 0) {
     targetBall.y = 0;
     targetBall.vy = -targetBall.vy;
+    playGameSound("wall");
+    spawnParticles(targetBall.x + targetBall.width / 2, targetBall.y, gameTheme.accentSecondary, 2, 0.8);
   }
 }
 
@@ -31,6 +37,10 @@ function bounceOffPaddle(targetBall = ball, targetPaddle = paddle) {
     const speed = BALL_SPEED + Math.min((level - 1) * 0.2, 1.5);
     targetBall.vx = Math.sin(angle) * speed;
     targetBall.vy = -Math.cos(angle) * speed;
+    paddleImpact = 9;
+    impactPaddle = targetPaddle;
+    playGameSound("paddle");
+    spawnParticles(targetBall.x + targetBall.width / 2, targetPaddle.y, gameTheme.paddle, 7, 1.7);
   }
 }
 
@@ -60,6 +70,7 @@ function bounceOffBricks(targetBall = ball) {
       }
     }
 
+    spawnParticles(targetBall.x + targetBall.width / 2, targetBall.y + targetBall.height / 2, gameTheme.brick, 2, 0.8);
     damageBrick(index, targetBall);
     break;
   }
