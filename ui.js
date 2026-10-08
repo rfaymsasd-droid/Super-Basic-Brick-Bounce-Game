@@ -651,6 +651,9 @@ function handleMenuClick(event) {
     settingsReturnScreen = "main-menu";
     renderStatistics();
     showScreen("statistics-screen");
+  } else if (action === "credits") {
+    settingsReturnScreen = "main-menu";
+    showScreen("credits-screen");
   } else if (action === "settings") {
     settingsReturnScreen = "main-menu";
     renderSettings();
@@ -736,8 +739,8 @@ function buildCustomizationOptions() {
 }
 
 function renderCustomization() {
-  for (const [category, value] of Object.entries(interfaceData.customization)) {
-    document.getElementById(`${category}-skin`).value = value;
+  for (const category of Object.keys(CUSTOM_OPTIONS)) {
+    document.getElementById(`${category}-skin`).value = interfaceData.customization[category];
   }
   applyCustomization();
 }
@@ -1014,7 +1017,7 @@ function nextLevel() {
 }
 
 function toggleFullscreen() {
-  const target = document.getElementById("app");
+  const target = document.documentElement;
   const request = target.requestFullscreen?.bind(target);
   const exit = document.exitFullscreen?.bind(document);
   const operation = document.fullscreenElement ? exit?.() : request?.();

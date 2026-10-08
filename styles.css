@@ -318,6 +318,18 @@ select {
   gap: 12px;
 }
 
+.credits-list {
+  display: grid;
+  gap: 12px;
+  color: #c1c9e2;
+}
+
+.credits-list p {
+  margin: 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #ffffff17;
+}
+
 .stat-tile {
   display: flex;
   min-height: 100px;
