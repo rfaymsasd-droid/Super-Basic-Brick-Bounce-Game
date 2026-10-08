@@ -198,6 +198,7 @@ function update() {
   }
 
   updateMechanics();
+  updateChaosMode();
   moveInvaders();
   updateTetrominoes();
   for (let index = balls.length - 1; index >= 0; index -= 1) {
@@ -887,6 +888,7 @@ function resetGame() {
   clearTetrominoes();
   movingTick = 0;
   gravityField = null;
+  resetChaosMode();
   paddle.width = 72;
   secondPaddle.width = 72;
   paddleTargetX = paddle.x;

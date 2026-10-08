@@ -10,6 +10,9 @@ const POWER_UPS = [
   { id: "laser", name: "Laser Paddle", color: "#dc83ff", shape: "laser", duration: 480, weight: 6 },
   { id: "shockwave", name: "Shockwave", color: "#ffad42", shape: "burst", duration: 0, weight: 5 }
 ];
+let chaosEventTimer = 0;
+let chaosEventLabelTimer = 0;
+let chaosGravityTimer = 0;
 let fallingPowerUps = [];
 let activeEffects = {};
 let laserShots = [];
@@ -322,6 +325,98 @@ function updateMechanics() {
   }
   updatePowerUpStatus();
   updateSpecialAbilityStatus();
+}
+
+function resetChaosMode() {
+  chaosEventTimer = 120 + Math.floor(Math.random() * 120);
+  chaosEventLabelTimer = 0;
+  chaosGravityTimer = 0;
+  const status = document.getElementById("chaos-event-status");
+  if (status) {
+    status.hidden = activeMode !== "chaos";
+    status.textContent = "Chaos event: anything can happen";
+  }
+}
+
+function updateChaosMode() {
+  const status = document.getElementById("chaos-event-status");
+  if (activeMode !== "chaos") {
+    if (status) status.hidden = true;
+    return;
+  }
+  if (status) status.hidden = false;
+
+  if (chaosGravityTimer > 0 && --chaosGravityTimer === 0) gravityField = null;
+  if (chaosEventLabelTimer > 0 && --chaosEventLabelTimer === 0 && status) {
+    status.textContent = "Chaos event: anything can happen";
+  }
+  chaosEventTimer -= 1;
+  if (chaosEventTimer > 0) return;
+
+  const events = [
+    {
+      label: "Ball scramble",
+      run() {
+        for (const targetBall of balls) {
+          if (targetBall.caught) continue;
+          const speed = Math.max(3, Math.min(8, Math.hypot(targetBall.vx, targetBall.vy) * (0.75 + Math.random() * 0.7)));
+          const angle = (0.3 + Math.random() * 0.4 + (Math.random() < 0.5 ? 0 : 1)) * Math.PI;
+          targetBall.vx = Math.cos(angle) * speed;
+          targetBall.vy = Math.sin(angle) * speed;
+        }
+      }
+    },
+    {
+      label: "Multiball burst",
+      run() {
+        const multiball = POWER_UPS.find((powerUp) => powerUp.id === "multiball");
+        const count = 1 + Math.floor(Math.random() * 2);
+        for (let index = 0; index < count && balls.length < 3; index += 1) collectPowerUp(multiball);
+      }
+    },
+    {
+      label: "Surprise power-up",
+      run() {
+        const powerUp = POWER_UPS[Math.floor(Math.random() * POWER_UPS.length)];
+        fallingPowerUps.push({ ...powerUp, x: Math.random() * (WIDTH - 24), y: -24, width: 24, height: 24, vy: 1.4 + Math.random() * 2.2 });
+      }
+    },
+    {
+      label: "Gravity well",
+      run() {
+        gravityField = {
+          x: Math.random() * WIDTH,
+          y: HEIGHT * (0.15 + Math.random() * 0.55),
+          radius: 150 + Math.random() * 180
+        };
+        chaosGravityTimer = 240 + Math.floor(Math.random() * 180);
+      }
+    },
+    {
+      label: "Paddle warp",
+      run() {
+        paddle.x = Math.random() * (WIDTH - paddle.width);
+        paddleTargetX = paddle.x;
+      }
+    },
+    {
+      label: "Enemy shuffle",
+      run() {
+        for (const invader of invaders) {
+          if (invader.type === "boss") continue;
+          invader.x = Math.random() * (WIDTH - invader.width);
+          invader.y = 48 + Math.random() * 180;
+        }
+        invaderDirection = Math.random() < 0.5 ? -1 : 1;
+        invaderFireTimer = Math.floor(Math.random() * 90);
+      }
+    }
+  ];
+  const event = events[Math.floor(Math.random() * events.length)];
+  event.run();
+  if (status) status.textContent = `Chaos event: ${event.label}`;
+  chaosEventLabelTimer = 180;
+  chaosEventTimer = 240 + Math.floor(Math.random() * 240);
 }
 
 function setEquippedSpecialAbility(ability) {

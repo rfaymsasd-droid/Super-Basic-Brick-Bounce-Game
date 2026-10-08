@@ -101,6 +101,7 @@
             <p>Original game - My Teacher</p>
             <p>Falling Tetris Blocks - Flopa</p>
             <p>Gamemodes - idonotknowhowtocode</p>
+            <p>Chaos Mode - idonotknowhowtocode</p>
           </div>
         </section>
 
@@ -158,6 +159,7 @@
                 <option value="daily">Daily Challenge</option>
                 <option value="zen">Zen</option>
                 <option value="coop">Local Co-op</option>
+                <option value="chaos">Chaos Mode</option>
               </select>
               <button id="restart-mode" type="button">Restart</button>
               <button id="launch-button" type="button" aria-label="Launch or release the ball">Launch</button>
@@ -175,6 +177,7 @@
           </header>
           <div class="game-status" aria-live="polite">
             <span>Mode <strong id="mode">Campaign</strong></span>
+            <span id="chaos-event-status" hidden>Chaos event: anything can happen</span>
             <span>Sector <strong id="world">Crimson Sector · 1/10</strong></span>
             <span>Level <strong id="level">1</strong></span>
             <span>Lives <strong id="lives">3</strong></span>

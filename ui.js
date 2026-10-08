@@ -710,7 +710,8 @@ function modeDescription(mode) {
     survival: "Survive escalating enemy formations on one life.",
     daily: "A shared, date-seeded daily formation.",
     zen: "A relaxed game without attacks or lost lives.",
-    coop: "Two paddles, two players, one shared ball."
+    coop: "Two paddles, two players, one shared ball.",
+    chaos: "Unpredictable events keep changing the rules as you play."
   };
   return descriptions[mode];
 }

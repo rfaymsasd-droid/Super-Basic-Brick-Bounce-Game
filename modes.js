@@ -7,7 +7,8 @@ const MODE_NAMES = {
   survival: "Survival",
   daily: "Daily Challenge",
   zen: "Zen",
-  coop: "Local Co-op"
+  coop: "Local Co-op",
+  chaos: "Chaos Mode"
 };
 
 const CAMPAIGN_LEVEL_COUNT = 10;
