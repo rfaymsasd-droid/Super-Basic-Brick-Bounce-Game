@@ -32,6 +32,14 @@ const paddle = {
   speed: 7
 };
 
+const secondPaddle = {
+  x: WIDTH / 2 - 36,
+  y: HEIGHT - 56,
+  width: 72,
+  height: 16,
+  speed: 7
+};
+
 let bricks = [];
 let invaders = [];
 let invaderBullets = [];
@@ -48,6 +56,13 @@ let combo = 0;
 let comboTimer = 0;
 let paused = false;
 let gameOver = false;
+let activeMode = "campaign";
+let modeTimer = 120 * 60;
+let dailySeed = 0;
+let endlessUnlocked = false;
+let campaignComplete = false;
+let dailyComplete = false;
+let gravityField = null;
 
 const keys = {};
 
@@ -98,6 +113,16 @@ function update() {
     return;
   }
 
+  if (activeMode === "time_attack") {
+    modeTimer -= 1;
+    if (modeTimer <= 0) {
+      modeTimer = 0;
+      gameOver = true;
+      updateStatus();
+      return;
+    }
+  }
+
   updateMechanics();
   moveInvaders();
   for (let index = balls.length - 1; index >= 0; index -= 1) {
@@ -105,7 +130,11 @@ function update() {
     if (targetBall.caught) continue;
     moveBall(targetBall);
     bounceOffWalls(targetBall);
-    bounceOffPaddle(targetBall);
+    for (const currentPaddle of getPaddles()) {
+      bounceOffPaddle(targetBall, currentPaddle);
+      if (targetBall.caught) break;
+    }
+    if (targetBall.caught) continue;
     bounceOffBricks(targetBall);
     bounceOffInvaders(targetBall);
     if (targetBall.y > HEIGHT) balls.splice(index, 1);
@@ -115,7 +144,7 @@ function update() {
     updateStatus();
     return;
   }
-  updateInvaderBullets();
+  if (activeMode !== "zen") updateInvaderBullets();
   if (gameOver || !started) {
     updateStatus();
     return;
@@ -128,35 +157,29 @@ function update() {
     }
   }
 
-  if (!gameOver && started && remainingBrickTargets() === 0 && invaders.length === 0) {
-    level += 1;
-    bricks = makeBricks(level);
-    invaders = makeInvaders(level);
-    invaderBullets = [];
-    invaderDirection = 1;
-    invaderFireTimer = 0;
-    started = false;
-    ballAttached = true;
-    positionBall();
-  }
+  if (!gameOver && started && areModeObjectivesComplete()) advanceModeLevel();
 
   updateStatus();
 }
 
 function movePaddle() {
   const speed = paddle.speed * (activeEffects.slow ? 0.7 : 1);
-  if (keys["arrowleft"] || keys["a"]) {
-    paddle.x -= speed;
+  if (activeMode === "coop") {
+    if (keys["arrowleft"]) paddle.x -= speed;
+    if (keys["arrowright"]) paddle.x += speed;
+    if (keys["a"]) secondPaddle.x -= speed;
+    if (keys["d"]) secondPaddle.x += speed;
+    paddle.x = Math.max(0, Math.min(WIDTH / 2 - paddle.width, paddle.x));
+    secondPaddle.x = Math.max(WIDTH / 2, Math.min(WIDTH - secondPaddle.width, secondPaddle.x));
+    return;
   }
-  if (keys["arrowright"] || keys["d"]) {
-    paddle.x += speed;
-  }
-
+  if (keys["arrowleft"] || keys["a"]) paddle.x -= speed;
+  if (keys["arrowright"] || keys["d"]) paddle.x += speed;
   paddle.x = Math.max(0, Math.min(WIDTH - paddle.width, paddle.x));
 }
 
 function positionBall() {
-  balls = [ball];
+  if (balls.length === 0) balls = [ball];
   ball.caught = false;
   ball.piercing = Boolean(activeEffects.piercing);
   ball.slowTimer = 0;
@@ -164,6 +187,10 @@ function positionBall() {
   ball.vy = 0;
   ball.x = paddle.x + (paddle.width - ball.width) / 2;
   ball.y = paddle.y - ball.height - 2;
+}
+
+function getPaddles() {
+  return activeMode === "coop" ? [paddle, secondPaddle] : [paddle];
 }
 
 function launchBall() {
@@ -180,6 +207,15 @@ function launchBall() {
 
 function moveBall(targetBall) {
   const speedFactor = activeEffects.slow ? 0.55 : targetBall.slowTimer > 0 ? 0.65 : 1;
+  if (gravityField) {
+    const dx = gravityField.x - (targetBall.x + targetBall.width / 2);
+    const dy = gravityField.y - (targetBall.y + targetBall.height / 2);
+    const distance = Math.hypot(dx, dy);
+    if (distance < gravityField.radius && distance > 0) {
+      targetBall.vx += dx / distance * 0.035;
+      targetBall.vy += dy / distance * 0.035;
+    }
+  }
   targetBall.x += targetBall.vx * speedFactor;
   targetBall.y += targetBall.vy * speedFactor;
 }
@@ -189,6 +225,7 @@ function moveInvaders() {
     return;
   }
 
+  if (activeMode === "classic" || activeMode === "zen") return;
   const speed = (0.7 + Math.min(level * 0.08, 1.2)) * (activeEffects.slow ? 0.55 : 1);
   const leftEdge = Math.min(...invaders.map((invader) => invader.x)) + invaderDirection * speed;
   const rightEdge = Math.max(...invaders.map((invader) => invader.x + invader.width)) + invaderDirection * speed;
@@ -205,6 +242,7 @@ function moveInvaders() {
     invader.x += invaderDirection * speed * typeMultiplier;
   }
 
+  if (activeMode === "zen") return;
   invaderFireTimer += activeEffects.slow ? 0.55 : 1;
   const boss = invaders.find((invader) => invader.type === "boss");
   const fireInterval = boss
@@ -218,26 +256,26 @@ function moveInvaders() {
     if (shooter) {
       let vx = 0;
       let vy = INVADER_BULLET_SPEED;
-      if (shooter.type === "sniper") {
+      if (shooter.type === "sniper" || shooter.type === "boss" && shooter.attackPattern === "aimed") {
         const dx = paddle.x + paddle.width / 2 - shooter.x;
         const dy = paddle.y - shooter.y;
         const magnitude = Math.hypot(dx, dy);
         vx = dx / magnitude * INVADER_BULLET_SPEED;
         vy = dy / magnitude * INVADER_BULLET_SPEED;
       }
-      invaderBullets.push({
-        x: shooter.x + shooter.width / 2 - 2,
-        y: shooter.y + shooter.height,
-        width: 4,
-        height: 12,
-        speed: INVADER_BULLET_SPEED,
-        vx,
-        vy
-      });
-      if (shooter.type === "boss" && shooter.phase >= 2) {
-        for (const spread of [-1, 1]) {
-          invaderBullets.push({ x: shooter.x + shooter.width / 2, y: shooter.y + shooter.height, width: 5, height: 10, speed: INVADER_BULLET_SPEED, vx: spread * 1.5, vy });
-        }
+      if (shooter.type === "boss") {
+        fireBossPattern(shooter);
+      } else {
+        invaderBullets.push({
+          x: shooter.x + shooter.width / 2 - 2,
+          y: shooter.y + shooter.height,
+          width: 4,
+          height: 12,
+          speed: INVADER_BULLET_SPEED,
+          vx,
+          vy,
+          electric: activeMode === "campaign" && level >= 11 && level <= 20 && Math.random() < 0.35
+        });
       }
     }
   }
@@ -255,7 +293,7 @@ function updateInvaderBullets() {
       continue;
     }
 
-    if (boxesTouch(bullet, paddle)) {
+    if (getPaddles().some((targetPaddle) => boxesTouch(bullet, targetPaddle))) {
       invaderBullets.splice(bulletIndex, 1);
       loseLife();
       return;
@@ -264,6 +302,13 @@ function updateInvaderBullets() {
 }
 
 function loseLife() {
+  if (activeMode === "zen") {
+    balls = [ball];
+    started = false;
+    ballAttached = true;
+    positionBall();
+    return;
+  }
   invaderBullets = [];
   if (shieldCharges > 0) {
     shieldCharges -= 1;
@@ -285,6 +330,7 @@ function loseLife() {
   shieldCharges = 0;
   shockwaveTimer = 0;
   paddle.width = 72;
+  secondPaddle.width = 72;
   updateStatus();
   if (lives === 0) {
     gameOver = true;
@@ -331,6 +377,7 @@ function draw() {
 
   ctx.fillStyle = "white";
   drawSquircle(paddle.x, paddle.y, paddle.width, paddle.height);
+  if (activeMode === "coop") drawSquircle(secondPaddle.x, secondPaddle.y, secondPaddle.width, secondPaddle.height);
   for (const targetBall of balls) {
     ctx.fillStyle = targetBall.piercing ? "#ff8a3d" : "white";
     drawSquircle(targetBall.x, targetBall.y, targetBall.width, targetBall.height);
@@ -340,6 +387,13 @@ function draw() {
   drawEnemyDetails();
   drawInvaderBullets();
   drawPowerUps();
+  drawBossHealth();
+  if (gravityField) {
+    ctx.strokeStyle = "rgba(152, 108, 255, 0.6)";
+    ctx.beginPath();
+    ctx.arc(gravityField.x, gravityField.y, gravityField.radius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 
   if (paused || gameOver || !started) {
     ctx.fillStyle = "rgba(0, 0, 0, 0.72)";
@@ -347,10 +401,14 @@ function draw() {
     ctx.fillStyle = "white";
     ctx.textAlign = "center";
     ctx.font = "bold 42px sans-serif";
-    const title = gameOver ? "GAME OVER" : paused ? "PAUSED" : "READY";
+    const title = gameOver ? drawModeOverlayTitle() : paused ? "PAUSED" : "READY";
     ctx.fillText(title, WIDTH / 2, HEIGHT / 2 - 12);
     ctx.font = "18px sans-serif";
-    const prompt = gameOver ? "Press R to restart" : paused ? "Press P to resume" : "Press SPACE to launch";
+    const prompt = gameOver
+      ? campaignComplete ? "Campaign complete! Endless mode unlocked — press R" : "Press R to restart"
+      : paused ? "Press P to resume"
+        : activeMode === "coop" ? "Player 1: ←/→ · Player 2: A/D · Space to launch"
+          : "Press SPACE to launch";
     ctx.fillText(prompt, WIDTH / 2, HEIGHT / 2 + 28);
   }
 }
@@ -374,20 +432,27 @@ function drawInvaders() {
 }
 
 function drawInvaderBullets() {
-  ctx.fillStyle = "white";
   for (const bullet of invaderBullets) {
+    ctx.fillStyle = bullet.electric ? "#4de3ff" : "white";
     ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+    if (bullet.electric) {
+      ctx.strokeStyle = "#b5f7ff";
+      ctx.strokeRect(bullet.x - 2, bullet.y - 2, bullet.width + 4, bullet.height + 4);
+    }
   }
 }
 
 function updateStatus() {
   document.getElementById("level").textContent = level;
-  document.getElementById("lives").textContent = lives;
+  document.getElementById("lives").textContent = activeMode === "zen" ? "∞" : lives;
   document.getElementById("score").textContent = score.toLocaleString();
   document.getElementById("high-score").textContent = highScore.toLocaleString();
   document.getElementById("combo").textContent = `x${combo}`;
   document.getElementById("bricks-left").textContent = remainingBrickTargets();
   document.getElementById("invaders-left").textContent = invaders.length;
+  document.getElementById("mode").textContent = getModeName(activeMode);
+  document.getElementById("world").textContent = getWorldName();
+  document.getElementById("timer").textContent = activeMode === "time_attack" ? `${Math.ceil(modeTimer / 60)}s` : "";
   updatePowerUpStatus();
 }
 
@@ -437,14 +502,21 @@ function frame(now) {
 }
 
 function resetGame() {
-  bricks = makeBricks(1);
-  invaders = makeInvaders(1);
+  const selectedMode = document.getElementById("mode-select").value;
+  if (selectedMode === "endless" && !endlessUnlocked) {
+    document.getElementById("mode-select").value = "campaign";
+    activeMode = "campaign";
+  } else {
+    activeMode = selectedMode;
+  }
+  modeTimer = 120 * 60;
+  dailySeed = getDailySeed();
   invaderBullets = [];
   invaderDirection = 1;
   invaderFireTimer = 0;
   paddle.x = WIDTH / 2 - paddle.width / 2;
+  secondPaddle.x = WIDTH / 2 - secondPaddle.width / 2;
   level = 1;
-  lives = STARTING_LIVES;
   score = 0;
   combo = 0;
   comboTimer = 0;
@@ -455,16 +527,31 @@ function resetGame() {
   laserCooldown = 0;
   shockwaveTimer = 0;
   movingTick = 0;
+  gravityField = null;
   paddle.width = 72;
+  secondPaddle.width = 72;
   started = false;
   ballAttached = true;
+  balls = [ball];
   paused = false;
   gameOver = false;
+  campaignComplete = false;
+  dailyComplete = false;
+  lives = getModeLives();
+  if (activeMode === "coop") {
+    paddle.x = WIDTH / 4 - paddle.width / 2;
+    secondPaddle.x = WIDTH * 3 / 4 - secondPaddle.width / 2;
+  }
+  initializeModeLevel();
   positionBall();
   updateStatus();
 }
 
 function start() {
+  endlessUnlocked = loadEndlessUnlocked();
+  document.getElementById("mode-select").addEventListener("change", resetGame);
+  document.getElementById("restart-mode").addEventListener("click", resetGame);
+  setEndlessOptionState();
   resetGame();
   lastTime = performance.now();
   requestAnimationFrame(frame);

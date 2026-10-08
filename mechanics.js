@@ -85,7 +85,10 @@ function damageInvader(index, targetBall) {
   invader.health -= 1;
   if (invader.health > 0) return;
   const [destroyed] = invaders.splice(index, 1);
-  registerTargetHit(destroyed.type === "boss" ? 500 : destroyed.type === "tank" ? 100 : 50);
+  registerTargetHit(destroyed.type === "boss" ? 3000 : destroyed.type === "tank" ? 100 : 50);
+  if (destroyed.type === "boss") {
+    if (activeMode === "campaign" || activeMode === "boss_rush") lives += 1;
+  }
   dropPowerUp(destroyed.x + destroyed.width / 2, destroyed.y, destroyed.type === "boss" ? 1 : 0.18);
   if (destroyed.type === "splitter") {
     for (let child = 0; child < 2; child += 1) {
@@ -128,7 +131,8 @@ function updateMechanics() {
   for (const invader of invaders) {
     if (invader.type === "phantom") invader.intangible = Math.floor(movingTick / 240) % 2 === 1;
     if (invader.type === "boss") {
-      invader.phase = invader.health > 10 ? 1 : invader.health > 5 ? 2 : 3;
+      const healthRatio = invader.health / invader.maxHealth;
+      invader.phase = healthRatio > 0.66 ? 1 : healthRatio > 0.33 ? 2 : 3;
     }
   }
   updateFallingPowerUps();
@@ -142,8 +146,9 @@ function updateMechanics() {
   for (const targetBall of balls) {
     if (targetBall.slowTimer > 0) targetBall.slowTimer -= 1;
     if (targetBall.caught) {
-      targetBall.x = paddle.x + (paddle.width - targetBall.width) / 2;
-      targetBall.y = paddle.y - targetBall.height - 2;
+      const caughtBy = targetBall.caughtBy || paddle;
+      targetBall.x = caughtBy.x + (caughtBy.width - targetBall.width) / 2;
+      targetBall.y = caughtBy.y - targetBall.height - 2;
     }
   }
   updatePowerUpStatus();
@@ -153,7 +158,7 @@ function updateFallingPowerUps() {
   for (let index = fallingPowerUps.length - 1; index >= 0; index -= 1) {
     const powerUp = fallingPowerUps[index];
     powerUp.y += powerUp.vy * (activeEffects.slow ? 0.55 : 1);
-    if (boxesTouch(powerUp, paddle)) {
+    if (getPaddles().some((targetPaddle) => boxesTouch(powerUp, targetPaddle))) {
       collectPowerUp(powerUp);
       fallingPowerUps.splice(index, 1);
     } else if (powerUp.y > HEIGHT) {
@@ -184,7 +189,8 @@ function collectPowerUp(powerUp) {
   } else if (powerUp.id === "expand") {
     setEffect("expand", powerUp.duration);
     paddle.width = 120;
-    paddle.x = Math.min(paddle.x, WIDTH - paddle.width);
+    if (activeMode === "coop") secondPaddle.width = 120;
+    paddle.x = Math.min(paddle.x, activeMode === "coop" ? WIDTH / 2 - paddle.width : WIDTH - paddle.width);
   } else if (powerUp.id === "slow") {
     setEffect("slow", powerUp.duration);
   } else if (powerUp.id === "double") {
@@ -202,13 +208,17 @@ function setEffect(id, duration) {
 
 function removeEffect(id) {
   delete activeEffects[id];
-  if (id === "expand") paddle.width = 72;
+  if (id === "expand") {
+    paddle.width = 72;
+    secondPaddle.width = 72;
+  }
   if (id === "piercing") for (const targetBall of balls) targetBall.piercing = false;
 }
 
-function catchBall(targetBall) {
+function catchBall(targetBall, targetPaddle = paddle) {
   if (!activeEffects.magnet) return false;
   targetBall.caught = true;
+  targetBall.caughtBy = targetPaddle;
   targetBall.vx = 0;
   targetBall.vy = 0;
   return true;
@@ -400,7 +410,7 @@ function drawEnemyDetails() {
     const colors = { scout: "#64e8ff", tank: "#ff9f43", sniper: "#ff5757", phantom: "#a88bff", "shield-generator": "#65ffcc", splitter: "#c4ff5c", boss: "#ff4de1" };
     ctx.fillStyle = colors[invader.type] || "white";
     if (invader.type === "boss") {
-      ctx.fillRect(invader.x, invader.y - 5, invader.width * invader.health / 16, 3);
+      ctx.fillRect(invader.x, invader.y - 5, invader.width * invader.health / invader.maxHealth, 3);
       ctx.strokeStyle = "#ff4de1";
       ctx.strokeRect(invader.x, invader.y, invader.width, invader.height);
     } else if (invader.type === "shield-generator") {

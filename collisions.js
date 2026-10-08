@@ -22,11 +22,11 @@ function bounceOffWalls(targetBall = ball) {
   }
 }
 
-function bounceOffPaddle(targetBall = ball) {
-  if (boxesTouch(targetBall, paddle) && targetBall.vy > 0) {
-    targetBall.y = paddle.y - targetBall.height;
-    if (catchBall(targetBall)) return;
-    const impactOffset = (targetBall.x + targetBall.width / 2 - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+function bounceOffPaddle(targetBall = ball, targetPaddle = paddle) {
+  if (boxesTouch(targetBall, targetPaddle) && targetBall.vy > 0) {
+    targetBall.y = targetPaddle.y - targetBall.height;
+    if (catchBall(targetBall, targetPaddle)) return;
+    const impactOffset = (targetBall.x + targetBall.width / 2 - (targetPaddle.x + targetPaddle.width / 2)) / (targetPaddle.width / 2);
     const angle = Math.max(-1, Math.min(1, impactOffset)) * Math.PI / 3;
     const speed = BALL_SPEED + Math.min((level - 1) * 0.2, 1.5);
     targetBall.vx = Math.sin(angle) * speed;

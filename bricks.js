@@ -18,16 +18,27 @@ const INVADER_LAYOUTS = [
   ["1010101010", "0101010101", "1010101010"]
 ];
 
-function makeBricks(level = 1) {
+function makeBricks(level = 1, seed = 0) {
   const list = [];
-  const layout = BRICK_LAYOUTS[(level - 1) % BRICK_LAYOUTS.length];
+  const layoutOffset = seed ? seed % BRICK_LAYOUTS.length : level - 1;
+  const layout = BRICK_LAYOUTS[layoutOffset % BRICK_LAYOUTS.length];
+  const campaignVariant = activeMode === "campaign" ? Math.floor((level - 1) / BRICK_LAYOUTS.length) : 0;
   const totalWidth = BRICK_COLUMNS * BRICK_WIDTH + (BRICK_COLUMNS - 1) * BRICK_GAP;
   const left = (WIDTH - totalWidth) / 2;
 
   for (let row = 0; row < BRICK_ROWS; row += 1) {
     for (let col = 0; col < BRICK_COLUMNS; col += 1) {
-      if (layout[row][col] === "1") {
-        const type = BRICK_TYPES[(row * BRICK_COLUMNS + col + level - 1) % BRICK_TYPES.length];
+      const sourceRow = campaignVariant % 2 === 1 ? BRICK_ROWS - row - 1 : row;
+      const sourceCol = campaignVariant % 3 === 1
+        ? BRICK_COLUMNS - col - 1
+        : (col + campaignVariant * 2) % BRICK_COLUMNS;
+      if (layout[sourceRow][sourceCol] === "1") {
+        const slot = row * BRICK_COLUMNS + col + (seed ? seed % BRICK_TYPES.length : level - 1);
+        const type = activeMode === "campaign"
+          ? getCampaignBrickType(level, slot)
+          : seed
+            ? BRICK_TYPES[(Math.imul(slot + 1, 31) + (seed >>> 8)) % BRICK_TYPES.length]
+            : BRICK_TYPES[(slot) % BRICK_TYPES.length];
         const health = type === "armored" ? 3 : type === "regenerating" ? 2 : 1;
         list.push({
           x: left + col * (BRICK_WIDTH + BRICK_GAP),
@@ -115,9 +126,10 @@ function drawBricks() {
   }
 }
 
-function makeInvaders(level = 1) {
+function makeInvaders(level = 1, seed = 0) {
   const list = [];
-  const layout = INVADER_LAYOUTS[(level - 1) % INVADER_LAYOUTS.length];
+  const layoutOffset = seed ? seed % INVADER_LAYOUTS.length : level - 1;
+  const layout = INVADER_LAYOUTS[layoutOffset % INVADER_LAYOUTS.length];
   const formationWidth = INVADER_COLUMNS * INVADER_WIDTH + (INVADER_COLUMNS - 1) * INVADER_GAP_X;
   const left = (WIDTH - formationWidth) / 2;
 
@@ -131,13 +143,13 @@ function makeInvaders(level = 1) {
         y: 52 + row * (INVADER_HEIGHT + INVADER_GAP_Y),
         width: INVADER_WIDTH,
         height: INVADER_HEIGHT,
-        type: level >= 4 && row === 0 && col === 4 ? "boss" :
-          level >= 2 && (row * INVADER_COLUMNS + col) % 11 === 0 ? "shield-generator" :
-          (row * INVADER_COLUMNS + col + level) % 13 === 0 ? "splitter" :
-          (row * INVADER_COLUMNS + col + level) % 9 === 0 ? "phantom" :
-          (row * INVADER_COLUMNS + col + level) % 7 === 0 ? "sniper" :
-          (row * INVADER_COLUMNS + col + level) % 5 === 0 ? "tank" :
-          (row * INVADER_COLUMNS + col + level) % 3 === 0 ? "scout" : "standard",
+        type: activeMode === "campaign" && level <= 10 ? "standard" :
+          ((row * INVADER_COLUMNS + col + (seed ? seed % 30 : level)) % 11 === 0 && level >= 2) ? "shield-generator" :
+          (row * INVADER_COLUMNS + col + (seed ? seed % 30 : level)) % 13 === 0 ? "splitter" :
+          (row * INVADER_COLUMNS + col + (seed ? seed % 30 : level)) % 9 === 0 ? "phantom" :
+          (row * INVADER_COLUMNS + col + (seed ? seed % 30 : level)) % 7 === 0 ? "sniper" :
+          (row * INVADER_COLUMNS + col + (seed ? seed % 30 : level)) % 5 === 0 ? "tank" :
+          (row * INVADER_COLUMNS + col + (seed ? seed % 30 : level)) % 3 === 0 ? "scout" : "standard",
         health: 1,
         fireTimer: 0,
         phase: 1,

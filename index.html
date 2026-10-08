@@ -8,9 +8,27 @@
   </head>
   <body>
     <main>
+      <div class="mode-controls">
+        <label for="mode-select">Game mode</label>
+        <select id="mode-select">
+          <option value="campaign" selected>Campaign · 1–50</option>
+          <option value="classic">Classic Arcade</option>
+          <option value="endless" disabled>Endless (Unlock by completing campaign)</option>
+          <option value="time_attack">Time Attack · 2 minutes</option>
+          <option value="boss_rush">Boss Rush</option>
+          <option value="survival">Survival</option>
+          <option value="daily">Daily Challenge</option>
+          <option value="zen">Zen</option>
+          <option value="coop">Local Co-op</option>
+        </select>
+        <button id="restart-mode" type="button">Start / Restart</button>
+      </div>
       <div class="game-status" aria-live="polite">
+        <span>Mode <strong id="mode">Campaign</strong></span>
+        <span>World <strong id="world">The Beginning · 1/50</strong></span>
         <span>Level <strong id="level">1</strong></span>
         <span>Lives <strong id="lives">3</strong></span>
+        <span>Time <strong id="timer"></strong></span>
         <span>Score <strong id="score">0</strong></span>
         <span>High score <strong id="high-score">0</strong></span>
         <span>Combo <strong id="combo">x0</strong></span>
@@ -19,12 +37,13 @@
       </div>
       <canvas id="game" width="900" height="650" aria-label="Brick breaker and space invaders game"></canvas>
       <p id="powerup-status" aria-live="polite">No active power-ups</p>
-      <p>Move with the left and right arrow keys or A and D. Press Space to launch or release a magnet-caught ball, F to fire lasers, P to pause, or R to restart.</p>
+      <p>Move with the left and right arrow keys or A and D. In co-op, Player 1 uses the arrows and Player 2 uses A/D. Press Space to launch or release a magnet-caught ball, F to fire lasers, P to pause, or R to restart.</p>
    </main>
 
    <script src="game.js"></script>
    <script src="bricks.js"></script>
    <script src="collisions.js"></script>
    <script src="mechanics.js"></script>
+   <script src="modes.js"></script>
   </body>
 </html>

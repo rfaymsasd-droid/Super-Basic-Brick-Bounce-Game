@@ -33,6 +33,29 @@ main {
   padding-left: 4px;
 }
 
+.mode-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.mode-controls select,
+.mode-controls button {
+  padding: 6px 10px;
+  color: #FFF;
+  border: 1px solid #FFF;
+  border-radius: 4px;
+  background: #111;
+  font: inherit;
+}
+
+.mode-controls button {
+  cursor: pointer;
+}
+
 #powerup-status {
   min-height: 1.5em;
   color: #65ffcc;
