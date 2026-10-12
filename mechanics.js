@@ -195,6 +195,9 @@ function damageBrick(index, targetBall) {
     return;
   }
   spawnParticles(targetBall.x + targetBall.width / 2, targetBall.y + targetBall.height / 2, brick.type === "frozen" ? gameTheme.accentTertiary : gameTheme.brick, 3, 1.1);
+  if (brick.corruptionRepair) {
+    maybeAddCorruptionRepairBonus(brick);
+  }
   playGameSound("brick");
   registerTargetHit(brick.type === "golden" ? 100 : 10);
   brick.health -= 1;
@@ -209,6 +212,9 @@ function destroyBrick(index) {
   const [brick] = bricks.splice(index, 1);
   if (!brick) return;
   chargeSpecialAbility(3);
+  if (brick.corruptionRepair) {
+    maybeAddCorruptionRepairBonus(brick);
+  }
   spawnParticles(brick.x + brick.width / 2, brick.y + brick.height / 2, brick.type === "golden" ? gameTheme.accentSecondary : gameTheme.brick, 10, 2.7);
   cameraShake = Math.max(cameraShake, 1.4);
   playGameSound("destroy");

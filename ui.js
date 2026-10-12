@@ -52,7 +52,7 @@ function loadInterfaceData() {
     customTheme: { ...THEME_PRESETS.crimson, id: "custom", name: "Custom Theme" },
     settings: {
       sound: true, sfxVolume: 0.7, music: true, musicVolume: 0.2, reducedMotion: false,
-      effectsIntensity: 0.6, colorblind: false, cameraShake: false, motionBlur: false,
+      effectsIntensity: 0.6, corruptionIntensity: 0.5, colorblind: false, cameraShake: false, motionBlur: false,
       animatedGrid: true, tetrisEffects: true, obstacleDensity: "low",
       obstacleMinSize: 20, obstacleMaxSize: 50, obstacleSpeed: 1,
       obstacleVisualIntensity: 0.6, obstacleExplosionParticles: true,
@@ -102,6 +102,7 @@ function normalizeObstacleSettings(settings) {
     obstacleMaxSize: maximum,
     obstacleSpeed: clamp(settings.obstacleSpeed, 0.5, 2, 1),
     obstacleVisualIntensity: clamp(settings.obstacleVisualIntensity, 0, 1, 0.6),
+    corruptionIntensity: clamp(settings.corruptionIntensity, 0, 1, 0.5),
     obstacleExplosionParticles: settings.obstacleExplosionParticles !== false,
     obstacleShapeVariety: settings.obstacleShapeVariety !== false,
     tetrisEffects: settings.tetrisEffects !== false,
@@ -182,6 +183,14 @@ function initializeInterface() {
     clearTetrominoes();
     saveInterfaceData();
   });
+  const corruptionIntensityInput = document.getElementById("corruption-intensity");
+  if (corruptionIntensityInput) {
+    corruptionIntensityInput.addEventListener("input", () => {
+      interfaceData.settings.corruptionIntensity = Number(corruptionIntensityInput.value);
+      document.getElementById("corruption-intensity-value").textContent = `${Math.round(interfaceData.settings.corruptionIntensity * 100)}%`;
+      saveInterfaceData();
+    });
+  }
   for (const [id, key, outputId] of [
     ["obstacle-min-size", "obstacleMinSize", "obstacle-min-size-value"],
     ["obstacle-max-size", "obstacleMaxSize", "obstacle-max-size-value"],
@@ -792,6 +801,11 @@ function applyCustomization() {
   document.getElementById("effects-volume-value").textContent = `${Math.round(interfaceData.settings.sfxVolume * 100)}%`;
   document.getElementById("music-volume-value").textContent = `${Math.round(interfaceData.settings.musicVolume * 100)}%`;
   document.getElementById("effects-intensity-value").textContent = `${Math.round(interfaceData.settings.effectsIntensity * 100)}%`;
+  const corruptionIntensityInput = document.getElementById("corruption-intensity");
+  if (corruptionIntensityInput) {
+    corruptionIntensityInput.value = interfaceData.settings.corruptionIntensity;
+    document.getElementById("corruption-intensity-value").textContent = `${Math.round(interfaceData.settings.corruptionIntensity * 100)}%`;
+  }
   const abilitySelect = document.getElementById("special-ability-select");
   if (abilitySelect) abilitySelect.value = interfaceData.settings.specialAbility;
   document.body.classList.toggle("colorblind-mode", interfaceData.settings.colorblind);
@@ -850,7 +864,12 @@ function renderSettings() {
   document.getElementById("effects-volume").value = interfaceData.settings.sfxVolume;
   document.getElementById("music-volume").value = interfaceData.settings.musicVolume;
   document.getElementById("effects-intensity").value = interfaceData.settings.effectsIntensity;
-  for (const [outputId, key] of [["effects-volume-value", "sfxVolume"], ["music-volume-value", "musicVolume"], ["effects-intensity-value", "effectsIntensity"]]) {
+  const corruptionIntensityInput = document.getElementById("corruption-intensity");
+  if (corruptionIntensityInput) {
+    corruptionIntensityInput.value = interfaceData.settings.corruptionIntensity;
+    document.getElementById("corruption-intensity-value").textContent = `${Math.round(interfaceData.settings.corruptionIntensity * 100)}%`;
+  }
+  for (const [outputId, key] of [["effects-volume-value", "sfxVolume"], ["music-volume-value", "musicVolume"], ["effects-intensity-value", "effectsIntensity"], ["corruption-intensity-value", "corruptionIntensity"]]) {
     const value = `${Math.round(interfaceData.settings[key] * 100)}%`;
     document.getElementById(outputId).value = value;
     document.getElementById(outputId).textContent = value;

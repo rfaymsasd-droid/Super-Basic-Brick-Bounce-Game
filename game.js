@@ -198,6 +198,7 @@ function update() {
   }
 
   updateMechanics();
+  updateCorruption();
   updateChaosMode();
   moveInvaders();
   updateTetrominoes();
@@ -566,6 +567,7 @@ function draw() {
   }
   drawGameBackground();
   drawTetrominoes();
+  drawCorruption();
   ctx.fillStyle = getCustomizationColor("paddle");
   drawPaddle(paddle);
   if (activeMode === "coop") drawPaddle(secondPaddle);
@@ -883,6 +885,7 @@ function resetGame() {
   laserCooldown = 0;
   shockwaveTimer = 0;
   resetGalacticBossState();
+  resetCorruptionState();
   cameraShake = 0;
   paddleImpact = 0;
   impactPaddle = paddle;

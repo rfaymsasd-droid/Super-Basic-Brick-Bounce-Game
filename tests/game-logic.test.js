@@ -61,3 +61,40 @@ test('service worker keeps legacy and modern caches isolated', () => {
   assert.match(source, /cacheKey = requestUrl\.pathname\.includes\("\/legacy\/"\) \? "\.\/legacy\/index\.html" : "\.\/index\.html"/i,
     'Modern and legacy navigations should use distinct cache keys');
 });
+
+test('corruption surge enters a warning phase and repair bricks push it back', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'corruption.js'), 'utf8');
+  const context = {
+    console,
+    Math,
+    WIDTH: 900,
+    HEIGHT: 650,
+    movingTick: 0,
+    activeMode: 'campaign',
+    level: 3,
+    balls: [{ x: 20, y: 300, width: 12, height: 12, vx: 2, vy: 4, caught: false }],
+    bricks: [
+      { x: 50, y: 120, width: 30, height: 16, type: 'normal', corruptionRepair: false },
+      { x: 120, y: 120, width: 30, height: 16, type: 'normal', corruptionRepair: false },
+      { x: 190, y: 120, width: 30, height: 16, type: 'normal', corruptionRepair: false }
+    ],
+    interfaceData: { settings: { corruptionIntensity: 0.5 } },
+    ctx: { save() {}, restore() {}, fillRect() {}, beginPath() {}, stroke() {}, fillText() {}, fillStyle: '', font: '', textAlign: '', globalAlpha: 1 },
+    registerBonusPoints: (points) => { context.bonus = (context.bonus || 0) + points; },
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+
+  vm.runInContext('triggerCorruptionSurge();', context);
+  const state = vm.runInContext('corruptionState', context);
+  assert.equal(state.active, true);
+  assert.equal(state.stage, 'warning');
+  assert.ok(context.bricks.some((brick) => brick.corruptionRepair));
+
+  const repairBrick = context.bricks.find((brick) => brick.corruptionRepair);
+  repairBrick.corruptionRepair = true;
+  vm.runInContext('maybeAddCorruptionRepairBonus(bricks.find((brick) => brick.corruptionRepair));', context);
+  const updatedState = vm.runInContext('corruptionState', context);
+  assert.ok(updatedState.pressure <= 0.2);
+  assert.equal(context.bonus, 150);
+});
