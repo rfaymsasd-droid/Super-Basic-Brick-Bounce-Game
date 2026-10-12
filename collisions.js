@@ -89,14 +89,49 @@ function bounceOffBricks(targetBall = ball) {
 }
 
 function bounceOffInvaders(targetBall = ball) {
+  const activeIndex = targetBall.lastInvaderHitIndex;
+  if (activeIndex !== undefined && activeIndex !== null && invaders[activeIndex] && !invaderIntangibleOrBlocked(targetBall, invaders[activeIndex])) {
+    targetBall.lastInvaderHitIndex = null;
+  }
+
   for (let index = invaders.length - 1; index >= 0; index -= 1) {
     const invader = invaders[index];
     if (invader.intangible || !boxesTouch(targetBall, invader)) {
       continue;
     }
+    if (targetBall.lastInvaderHitIndex === index) return;
 
-    targetBall.vy = -targetBall.vy;
+    const overlapX = Math.min(targetBall.x + targetBall.width, invader.x + invader.width) - Math.max(targetBall.x, invader.x);
+    const overlapY = Math.min(targetBall.y + targetBall.height, invader.y + invader.height) - Math.max(targetBall.y, invader.y);
+
+    if (overlapX > 0 && overlapY > 0) {
+      if (overlapX < overlapY) {
+        if (targetBall.x < invader.x) {
+          targetBall.x = invader.x - targetBall.width;
+        } else {
+          targetBall.x = invader.x + invader.width;
+        }
+        targetBall.vx = -targetBall.vx;
+      } else {
+        if (targetBall.y < invader.y) {
+          targetBall.y = invader.y - targetBall.height;
+        } else {
+          targetBall.y = invader.y + invader.height;
+        }
+        targetBall.vy = -targetBall.vy;
+      }
+    }
+
+    targetBall.lastInvaderHitIndex = index;
     damageInvader(index, targetBall);
     break;
   }
+
+  if (targetBall.lastInvaderHitIndex !== null && !invaders.some((invader, index) => index === targetBall.lastInvaderHitIndex && !invader.intangible && boxesTouch(targetBall, invader))) {
+    targetBall.lastInvaderHitIndex = null;
+  }
+}
+
+function invaderIntangibleOrBlocked(targetBall = ball, invader) {
+  return !invader || invader.intangible || !boxesTouch(targetBall, invader);
 }

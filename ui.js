@@ -624,14 +624,17 @@ function handleMenuClick(event) {
     resetGame();
     beginGame(false);
   } else if (action === "continue") {
-    document.getElementById("mode-select").value = interfaceData.save.mode || "campaign";
+    const savedMode = interfaceData.save?.mode || "campaign";
+    const savedLevel = Number.isFinite(Number(interfaceData.save?.level)) ? Number(interfaceData.save.level) : 1;
+    const savedLives = Number.isFinite(Number(interfaceData.save?.lives)) ? Number(interfaceData.save.lives) : getModeLives();
+    const savedScore = Number.isFinite(Number(interfaceData.save?.score)) ? Number(interfaceData.save.score) : 0;
+    if (savedMode !== "zen" && savedLives <= 0) return;
+    document.getElementById("mode-select").value = savedMode;
     resetGame();
-    if (activeMode === "campaign" || activeMode === "endless") {
-      level = Math.min(interfaceData.save.level, CAMPAIGN_LEVEL_COUNT);
-      initializeModeLevel();
-    }
-    score = interfaceData.save.score || 0;
-    lives = interfaceData.save.lives || getModeLives();
+    level = savedMode === "campaign" ? Math.min(Math.max(1, savedLevel), CAMPAIGN_LEVEL_COUNT) : Math.max(1, savedLevel);
+    initializeModeLevel();
+    score = savedScore;
+    lives = savedLives > 0 ? savedLives : getModeLives();
     beginGame(true);
   } else if (action === "modes") {
     settingsReturnScreen = "main-menu";
@@ -681,9 +684,12 @@ function beginGame(isContinue) {
 
 function renderContinueButton() {
   const button = document.getElementById("continue-button");
-  const canContinue = interfaceData.stats.gamesPlayed > 0;
+  const savedMode = interfaceData.save?.mode || "campaign";
+  const savedLevel = Number.isFinite(Number(interfaceData.save?.level)) ? Number(interfaceData.save.level) : 1;
+  const savedLives = Number.isFinite(Number(interfaceData.save?.lives)) ? Number(interfaceData.save.lives) : 0;
+  const canContinue = interfaceData.stats.gamesPlayed > 0 && (savedMode === "zen" || savedLives > 0);
   button.disabled = !canContinue;
-  button.textContent = canContinue ? `Continue · ${getModeName(interfaceData.save.mode)} · Level ${Math.min(interfaceData.save.level, CAMPAIGN_LEVEL_COUNT)}` : "Continue · No saved progress";
+  button.textContent = canContinue ? `Continue · ${getModeName(savedMode)} · Level ${Math.max(1, savedLevel)}` : "Continue · No saved progress";
 }
 
 function renderModeOptions() {
@@ -940,9 +946,7 @@ function showGameOver() {
   gameActive = false;
   updateSpecialAbilityStatus();
   interfaceData.stats.bestScore = Math.max(interfaceData.stats.bestScore, score);
-  if (activeMode === "campaign" || activeMode === "endless") {
-    interfaceData.save = { mode: activeMode, level, score, lives };
-  }
+  interfaceData.save = { mode: activeMode, level, score, lives };
   saveInterfaceData();
   document.getElementById("game-over-title").textContent = dailyComplete ? "Daily Challenge Complete" : modeTimer === 0 ? "Time Attack Complete" : "Game Over";
   document.getElementById("final-score").textContent = score.toLocaleString();
@@ -953,10 +957,8 @@ function showGameOver() {
 }
 
 function saveLevelProgress() {
-  if (activeMode === "campaign" || activeMode === "endless") {
-    const completedLevel = activeMode === "campaign" ? Math.min(CAMPAIGN_LEVEL_COUNT, level + 1) : level + 1;
-    interfaceData.save = { mode: activeMode, level: Math.max(interfaceData.save.level, completedLevel), score, lives };
-  }
+  const completedLevel = activeMode === "campaign" ? Math.min(CAMPAIGN_LEVEL_COUNT, level + 1) : level + 1;
+  interfaceData.save = { mode: activeMode, level: Math.max(Number(interfaceData.save?.level) || 1, completedLevel), score, lives };
   interfaceData.stats.highestLevel = Math.max(interfaceData.stats.highestLevel, level);
   interfaceData.stats.bestScore = Math.max(interfaceData.stats.bestScore, score);
   unlockAchievements();

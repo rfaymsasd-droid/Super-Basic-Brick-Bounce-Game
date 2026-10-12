@@ -251,6 +251,7 @@ function damageInvader(index, targetBall) {
       destroyed.beamTimer = 0;
       invaderBullets = [];
       spawnGalacticBossFragments(destroyed);
+      galacticBossDefeatReward = 3000 + 5000;
       registerBonusPoints(5000);
       playGameSound("destroy");
     }
@@ -502,11 +503,15 @@ function collectPowerUp(powerUp) {
       if (balls.length >= 3) break;
       balls.push({
         ...sourceBall,
+        trail: [...(sourceBall.trail || [])],
+        trickShotPieces: [...(sourceBall.trickShotPieces || [])],
         vx: sourceBall.vx + direction * 2.2 || direction * 2.2,
         vy: sourceBall.vy || -BALL_SPEED,
         caught: false,
-        trickShotPieces: [],
-        trickShotTimer: 0
+        trickShotTimer: 0,
+        slowTimer: sourceBall.slowTimer || 0,
+        piercing: Boolean(sourceBall.piercing),
+        lastInvaderHitIndex: null
       });
     }
   } else if (powerUp.id === "life") {

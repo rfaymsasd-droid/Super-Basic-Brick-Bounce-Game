@@ -53,6 +53,7 @@ const GALACTIC_COLORS = {
 };
 let galacticBossFragments = [];
 let galacticBossDefeatTimer = 0;
+let galacticBossDefeatReward = 0;
 
 function loadEndlessUnlocked() {
   try {
@@ -447,13 +448,14 @@ function drawGalacticBossEffects() {
     ctx.fillStyle = GALACTIC_COLORS.cyan;
     ctx.font = "bold 32px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("BOSS DEFEATED · +5,000", WIDTH / 2, HEIGHT / 2);
+    ctx.fillText(`BOSS DEFEATED · +${(galacticBossDefeatReward || 0).toLocaleString()}`, WIDTH / 2, HEIGHT / 2);
   }
 }
 
 function resetGalacticBossState() {
   galacticBossFragments = [];
   galacticBossDefeatTimer = 0;
+  galacticBossDefeatReward = 0;
 }
 
 function areModeObjectivesComplete() {

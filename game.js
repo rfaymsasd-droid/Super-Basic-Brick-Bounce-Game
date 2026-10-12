@@ -863,6 +863,8 @@ function resetGame() {
   invaderBullets = [];
   invaderDirection = 1;
   invaderFireTimer = 0;
+  paddle.width = 72;
+  secondPaddle.width = 72;
   paddle.x = WIDTH / 2 - paddle.width / 2;
   secondPaddle.x = WIDTH / 2 - secondPaddle.width / 2;
   paddleTargetX = paddle.x;
