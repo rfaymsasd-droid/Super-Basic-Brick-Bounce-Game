@@ -511,23 +511,47 @@ function registerBonusPoints(points) {
 }
 
 function registerTetrominoRicochet(targetBall, pieceId) {
+  if (interfaceData.settings.obstacleDensity !== "chaos") {
+    targetBall.trickShotPieces ||= [];
+    if (targetBall.trickShotTimer <= 0) targetBall.trickShotPieces = [];
+    targetBall.trickShotTimer = 600;
+    if (targetBall.trickShotPieces.includes(pieceId)) return;
+    targetBall.trickShotPieces.push(pieceId);
+    if (targetBall.trickShotPieces.length < 3) return;
+    targetBall.trickShotPieces = [];
+    targetBall.trickShotTimer = 0;
+    chargeSpecialAbility(25);
+    registerBonusPoints(300);
+    playGameSound("trick");
+    if (!interfaceData.settings.reducedMotion && interfaceData.settings.effectsIntensity > 0) {
+      spawnParticles(targetBall.x + targetBall.width / 2, targetBall.y + targetBall.height / 2,
+        gameTheme.accentSecondary, 14, 2.5);
+    }
+    trickShotTimer = 55;
+    trickShotX = targetBall.x + targetBall.width / 2;
+    trickShotY = targetBall.y;
+    return;
+  }
   targetBall.trickShotPieces ||= [];
   if (targetBall.trickShotTimer <= 0) targetBall.trickShotPieces = [];
   targetBall.trickShotTimer = 600;
-  if (targetBall.trickShotPieces.includes(pieceId)) return;
+  targetBall.tetrominoRicochetIds ||= [];
+  if (targetBall.tetrominoRicochetIds.includes(pieceId)) return;
+  targetBall.tetrominoRicochetIds.push(pieceId);
+  targetBall.tetrominoRicochetStreak = (targetBall.tetrominoRicochetStreak || 0) + 1;
+  if (targetBall.tetrominoRicochetIds.length > 120) targetBall.tetrominoRicochetIds.shift();
   targetBall.trickShotPieces.push(pieceId);
-  if (targetBall.trickShotPieces.length < 3) return;
-
-  targetBall.trickShotPieces = [];
-  targetBall.trickShotTimer = 0;
-  chargeSpecialAbility(25);
-  registerBonusPoints(300);
+  const streak = targetBall.tetrominoRicochetStreak;
+  if (streak % 3 !== 0) return;
+  const multiplier = Math.min(5, Math.floor(streak / 3));
+  chargeSpecialAbility(15);
+  registerBonusPoints(300 * multiplier);
   playGameSound("trick");
   if (!interfaceData.settings.reducedMotion && interfaceData.settings.effectsIntensity > 0) {
     spawnParticles(targetBall.x + targetBall.width / 2, targetBall.y + targetBall.height / 2,
-      gameTheme.accentSecondary, 14, 2.5);
+      gameTheme.accentSecondary, 14 + multiplier * 3, 2.5 + multiplier * 0.2);
   }
-  trickShotTimer = 55;
+  trickShotTimer = 60;
   trickShotX = targetBall.x + targetBall.width / 2;
   trickShotY = targetBall.y;
 }
@@ -644,6 +668,7 @@ function draw() {
           : "Press SPACE to launch";
     ctx.fillText(prompt, WIDTH / 2, HEIGHT / 2 + 28);
   }
+  drawChaosAnnouncement();
 }
 
 function drawPaddle(targetPaddle) {
@@ -732,6 +757,11 @@ function updateStatus() {
   updateStatusCounter("bricks-left", remainingBrickTargets());
   updateStatusCounter("invaders-left", invaders.length);
   updateCorruptionStatus();
+  updateChaosIntensityStatus();
+  const ricochetStreak = Math.max(0, ...balls.map((targetBall) => targetBall.tetrominoRicochetStreak || 0));
+  const streakStatus = document.getElementById("ricochet-streak");
+  streakStatus.textContent = ricochetStreak ? `x${Math.min(5, 1 + Math.floor(ricochetStreak / 3))} · ${ricochetStreak}` : "—";
+  document.getElementById("ricochet-streak-indicator").hidden = interfaceData.settings.obstacleDensity !== "chaos";
   document.getElementById("mode").textContent = getModeName(activeMode);
   document.getElementById("world").textContent = getWorldName();
   document.getElementById("timer").textContent = activeMode === "time_attack" ? `${Math.ceil(modeTimer / 60)}s` : "";

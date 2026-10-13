@@ -40,6 +40,8 @@ function bounceOffPaddle(targetBall = ball, targetPaddle = paddle) {
     targetBall.vy = -Math.cos(angle) * speed;
     targetBall.trickShotPieces = [];
     targetBall.trickShotTimer = 0;
+    targetBall.tetrominoRicochetIds = [];
+    targetBall.tetrominoRicochetStreak = 0;
     paddleImpact = 9;
     impactPaddle = targetPaddle;
     if (perfectHit) {

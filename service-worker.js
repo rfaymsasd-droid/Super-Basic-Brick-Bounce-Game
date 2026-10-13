@@ -1,4 +1,4 @@
-const CACHE_NAME = "vector-break-shell-v7";
+const CACHE_NAME = "vector-break-shell-v8";
 const LEGACY_CACHE_NAME = "vector-break-legacy-v1";
 const APP_SHELL = [
   "./",

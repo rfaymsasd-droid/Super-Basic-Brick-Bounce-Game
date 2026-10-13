@@ -3,8 +3,23 @@ const OBSTACLE_DENSITIES = {
   low: { min: 3, max: 5, interval: 24, burst: 1 },
   normal: { min: 5, max: 8, interval: 17, burst: 2 },
   high: { min: 8, max: 12, interval: 12, burst: 2 },
-  chaos: { min: 12, max: 20, interval: 8, burst: 3 }
+  chaos: { min: 35, max: 60, interval: 2, burst: 6 }
 };
+const CHAOS_WAVES = [
+  { id: "tsunami", label: "Tetris Tsunami", duration: 300, interval: 2, burst: 7, minimum: 35, maximum: 60 },
+  { id: "pixel-rain", label: "Pixel Rain", duration: 300, interval: 1, burst: 8, minimum: 55, maximum: 80 },
+  { id: "giant-invasion", label: "Giant Invasion", duration: 240, interval: 3, burst: 3, minimum: 35, maximum: 48 },
+  { id: "zigzag", label: "Zigzag Mayhem", duration: 300, interval: 2, burst: 6, minimum: 40, maximum: 65 },
+  { id: "hypervelocity", label: "Hypervelocity Storm", duration: 240, interval: 2, burst: 7, minimum: 45, maximum: 70 },
+  { id: "swarm", label: "Swarm", duration: 300, interval: 1, burst: 8, minimum: 60, maximum: 85 },
+  { id: "mixed", label: "Mixed Madness", duration: 300, interval: 2, burst: 7, minimum: 40, maximum: 70 },
+  { id: "corruption", label: "Corruption Storm", duration: 240, interval: 2, burst: 6, minimum: 35, maximum: 60 }
+];
+const MAX_CHAOS_OBSTACLES = 100;
+const MAX_CHAOS_CELLS = 600;
+const MAX_CHAOS_AREA = WIDTH * HEIGHT * 0.55;
+const MAX_TETROMINO_PARTICLES = 500;
+const OBSTACLE_GRID_SIZE = 64;
 const CLASSIC_OBSTACLE_SHAPES = [
   { name: "I", cells: [[0, 0], [1, 0], [2, 0], [3, 0]] },
   { name: "O", cells: [[0, 0], [1, 0], [0, 1], [1, 1]] },
@@ -53,6 +68,17 @@ let tetrominoTargetActive = 0;
 let tetrominoSpawnCount = 0;
 let recentTetrominoXs = [];
 let nextTetrominoId = 1;
+let tetrominoSpatialGrid = new Map();
+let chaosWave = null;
+let chaosWaveTimer = 0;
+let chaosWarningTimer = 0;
+let chaosIntensity = 0;
+let chaosMaximumTimer = 0;
+let chaosMaximumPending = false;
+let chaosAnnouncementTimer = 0;
+let chaosWaveIndex = -1;
+let chaosWaveInterval = 2;
+let chaosWaveBurst = 6;
 
 function normalizeObstacleCells(cells) {
   let minX = Infinity;
@@ -128,8 +154,9 @@ function buildTetrominoShapes() {
     for (const cells of polyominoes) addShape(`Poly-${size}`, cells);
   }
 
-  for (let attempt = 0; attempt < 400 && catalog.length < 100; attempt += 1) {
-    const targetSize = 7 + Math.floor(Math.random() * 4);
+  let generatedShapes = 0;
+  for (let attempt = 0; attempt < 700 && generatedShapes < 120; attempt += 1) {
+    const targetSize = 7 + Math.floor(Math.random() * 6);
     const cells = [[0, 0]];
     const occupied = new Set(["0,0"]);
     while (cells.length < targetSize) {
@@ -142,7 +169,7 @@ function buildTetrominoShapes() {
         cells.push(next);
       }
     }
-    addShape(`Procedural-${catalog.length + 1}`, cells);
+    if (addShape(`Procedural-${catalog.length + 1}`, cells)) generatedShapes += 1;
   }
   return catalog;
 }
@@ -163,6 +190,13 @@ function getObstacleSettings() {
 
 function chooseObstacleCellSize(wave) {
   const { minimum, maximum } = getObstacleSettings();
+  if (interfaceData.settings.obstacleDensity === "chaos") {
+    const giant = wave === "giant-invasion";
+    const small = wave === "pixel-rain" || wave === "swarm";
+    const low = giant ? Math.max(18, Math.min(26, minimum)) : small ? 10 : 14;
+    const high = giant ? 44 : small ? 18 : 30;
+    return Math.round((low + Math.random() * (high - low)) / 2) * 2;
+  }
   const roll = Math.random();
   let fraction = roll < 0.42 ? 0.08 + Math.random() * 0.17
     : roll < 0.79 ? 0.28 + Math.random() * 0.22
@@ -175,7 +209,18 @@ function chooseObstacleCellSize(wave) {
 
 function chooseTetrominoShape() {
   const variety = interfaceData.settings.obstacleShapeVariety !== false;
-  const pool = variety ? TETROMINO_SHAPES : [...CLASSIC_OBSTACLE_SHAPES, ...PENTOMINO_SHAPES.slice(0, 4)];
+  const chaos = interfaceData.settings.obstacleDensity === "chaos";
+  const smallWave = chaos && (chaosWave?.id === "pixel-rain" || chaosWave?.id === "swarm");
+  const giantWave = chaos && chaosWave?.id === "giant-invasion";
+  const chaosPool = smallWave
+    ? TETROMINO_SHAPES.filter((shape) => shape.cells.length <= 6)
+    : giantWave
+      ? TETROMINO_SHAPES.filter((shape) => shape.cells.length >= 7)
+      : TETROMINO_SHAPES;
+  const pool = chaos && variety
+    ? chaosPool
+    : variety ? TETROMINO_SHAPES.filter((shape) => !shape.name.startsWith("Procedural-"))
+      : [...CLASSIC_OBSTACLE_SHAPES, ...PENTOMINO_SHAPES.slice(0, 4)];
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -210,8 +255,11 @@ function chooseObstacleX(width) {
 }
 
 function spawnTetromino() {
+  if (fallingTetrominoes.length >= MAX_CHAOS_OBSTACLES) return false;
   const shape = chooseTetrominoShape();
   const cells = orientObstacleShape(shape);
+  if (interfaceData.settings.obstacleDensity === "chaos" &&
+      fallingTetrominoes.reduce((total, piece) => total + piece.cells.length, 0) + cells.length > MAX_CHAOS_CELLS) return false;
   let columns = 1;
   let rows = 1;
   for (const [x, y] of cells) {
@@ -219,15 +267,24 @@ function spawnTetromino() {
     rows = Math.max(rows, y + 1);
   }
   const wave = tetrominoWave;
-  const cellSize = chooseObstacleCellSize(wave);
+  const chaos = interfaceData.settings.obstacleDensity === "chaos";
+  const cellSize = chooseObstacleCellSize(chaos ? chaosWave?.id : wave);
   const width = columns * cellSize;
   const height = rows * cellSize;
   const settings = getObstacleSettings();
   const levelScale = Math.min(1.35, 1 + Math.max(0, level - 1) * 0.012);
   const waveScale = wave === "mixed" ? 1 : wave === "alternating" ? 0.92 : 1.08;
-  const speed = (0.65 + Math.random() * 0.65) * settings.speed * levelScale * waveScale;
+  if (chaos && (fallingTetrominoes.reduce((total, piece) => total + piece.cells.length * piece.cellSize * piece.cellSize, 0) +
+      cells.length * cellSize * cellSize > MAX_CHAOS_AREA)) return false;
+  if (chaos && cells.length > 7 && fallingTetrominoes.filter((piece) => piece.cells.length > 7).length >=
+      (chaosWave?.id === "giant-invasion" ? 7 : 3)) return false;
+  const speed = (0.65 + Math.random() * 0.65) * settings.speed * levelScale * waveScale *
+    (chaos && chaosWave?.id === "hypervelocity" ? 2.5 + Math.random() * 1.5 : 1);
   let x = chooseObstacleX(width);
-  if (wave === "alternating") {
+  if (chaos && chaosWave?.id === "zigzag") {
+    const fraction = tetrominoSpawnCount % 2 === 0 ? 0.25 : 0.75;
+    x = Math.max(0, Math.min(WIDTH - width, WIDTH * fraction - width / 2));
+  } else if (wave === "alternating") {
     const fraction = tetrominoSpawnCount % 2 === 0 ? 0.1 : 0.9;
     x = Math.max(0, Math.min(WIDTH - width, WIDTH * fraction - width / 2));
   }
@@ -246,21 +303,44 @@ function spawnTetromino() {
     height,
     baseVy: speed,
     vy: speed,
-    vx: 0,
+    vx: chaos && (chaosWave?.id === "zigzag" || chaosWave?.id === "mixed" || chaosWave?.id === "corruption")
+      ? (Math.random() - 0.5) * (chaosWave.id === "zigzag" ? 2.8 : 1.4)
+      : 0,
     color: TETROMINO_COLORS[colorIndex],
     trail: [],
     pulse: Math.random() * Math.PI * 2,
-    pattern: Math.floor(Math.random() * 3)
+    pattern: Math.floor(Math.random() * 3),
+    chaosMotion: chaos && !interfaceData.settings.reducedMotion && Math.random() < 0.45
+      ? ["drift", "wobble", "bounce", "rotate"][Math.floor(Math.random() * 4)] : "",
+    motionTick: Math.floor(Math.random() * 90),
+    direction: Math.random() < 0.5 ? -1 : 1,
+    rotated: false
   });
+  return true;
 }
 
 function clearTetrominoes() {
   fallingTetrominoes.length = 0;
+  tetrominoSpatialGrid.clear();
   clearTetrominoVisualEffects();
   tetrominoSpawnTimer = 0;
   tetrominoWaveTimer = 0;
   tetrominoTargetActive = 0;
   recentTetrominoXs.length = 0;
+  resetChaosWaveDirector();
+}
+
+function resetChaosWaveDirector() {
+  chaosWave = null;
+  chaosWaveTimer = 0;
+  chaosWarningTimer = 0;
+  chaosIntensity = 0;
+  chaosMaximumTimer = 0;
+  chaosMaximumPending = false;
+  chaosAnnouncementTimer = 0;
+  chaosWaveIndex = -1;
+  chaosWaveInterval = 2;
+  chaosWaveBurst = 6;
 }
 
 function clearTetrominoVisualEffects() {
@@ -292,53 +372,228 @@ function updateTetrominoEffects() {
   }
 }
 
+function updateChaosWaveDirector() {
+  if (chaosMaximumTimer > 0) {
+    chaosMaximumTimer -= 1;
+    if (chaosMaximumTimer === 0) {
+      startChaosWave(CHAOS_WAVES.find((wave) => wave.id === "mixed"));
+      tetrominoTargetActive = 45;
+      chaosIntensity = 28;
+    }
+    return;
+  }
+
+  if (chaosWarningTimer > 0) {
+    chaosWarningTimer -= 1;
+    if (chaosWarningTimer === 0) {
+      if (chaosMaximumPending) {
+        chaosMaximumPending = false;
+        chaosMaximumTimer = 210;
+        chaosWaveInterval = 1;
+        chaosWaveBurst = 10;
+        tetrominoTargetActive = MAX_CHAOS_OBSTACLES;
+        chaosWave = { id: "maximum", label: "MAXIMUM CHAOS", duration: 210, interval: 1, burst: 10 };
+        chaosAnnouncementTimer = 150;
+      } else {
+        startChaosWave(chaosWave);
+      }
+    }
+    return;
+  }
+
+  if (!chaosWave) {
+    startChaosWave(CHAOS_WAVES.find((wave) => wave.id === "mixed"));
+    chaosWaveTimer = 240;
+    tetrominoTargetActive = 45;
+    return;
+  }
+
+  chaosWaveTimer -= 1;
+  if (chaosWaveTimer <= 0) {
+    chaosWaveIndex = (chaosWaveIndex + 1 + Math.floor(Math.random() * (CHAOS_WAVES.length - 1))) % CHAOS_WAVES.length;
+    const nextWave = CHAOS_WAVES[chaosWaveIndex];
+    if (nextWave.id === "pixel-rain" || nextWave.id === "swarm") {
+      chaosWarningTimer = 45;
+      chaosAnnouncementTimer = 45;
+      chaosMaximumPending = false;
+      chaosWave = nextWave;
+      return;
+    }
+    startChaosWave(nextWave);
+  }
+
+  const active = fallingTetrominoes.length;
+  const cellCount = fallingTetrominoes.reduce((total, piece) => total + piece.cells.length, 0);
+  const target = Math.max(1, tetrominoTargetActive);
+  const densityScore = Math.min(1, active / target) * 65;
+  const cellScore = Math.min(1, cellCount / MAX_CHAOS_CELLS) * 25;
+  const waveScore = chaosWave.id === "mixed" ? 5 : 10;
+  const targetIntensity = Math.round(Math.min(100, densityScore + cellScore + waveScore));
+  chaosIntensity += Math.sign(targetIntensity - chaosIntensity) *
+    Math.min(2, Math.abs(targetIntensity - chaosIntensity) * 0.08);
+
+  if (chaosIntensity >= 85 && chaosMaximumTimer === 0) {
+    chaosIntensity = 100;
+    chaosWarningTimer = 45;
+    chaosAnnouncementTimer = 45;
+    chaosMaximumPending = true;
+    chaosWaveTimer = 240;
+  }
+}
+
+function startChaosWave(wave) {
+  chaosWave = wave;
+  chaosWaveTimer = wave.duration;
+  chaosWaveInterval = wave.interval;
+  chaosWaveBurst = wave.burst;
+  tetrominoTargetActive = wave.minimum +
+    Math.floor(Math.random() * (wave.maximum - wave.minimum + 1));
+  chaosAnnouncementTimer = 100;
+}
+
+function updateChaosIntensityStatus() {
+  const meter = document.getElementById("chaos-meter");
+  const indicator = document.getElementById("chaos-level-indicator");
+  if (!meter || !indicator) return;
+  const visible = interfaceData.settings.obstacleDensity === "chaos";
+  indicator.hidden = !visible;
+  if (!visible) return;
+  const progress = Math.max(0, Math.min(100, Math.round(chaosIntensity)));
+  meter.style.width = `${progress}%`;
+  const track = document.getElementById("chaos-meter-track");
+  track.setAttribute("aria-valuenow", String(progress));
+  track.setAttribute("aria-valuetext", `${progress}% chaos, ${fallingTetrominoes.length} obstacles`);
+  document.getElementById("chaos-level-value").textContent = `${progress}%`;
+  document.getElementById("chaos-wave-status").textContent = chaosWarningTimer > 0
+    ? `Incoming: ${chaosMaximumPending ? "Maximum Chaos" : chaosWave?.label || "special wave"}`
+    : chaosMaximumTimer > 0
+      ? "MAXIMUM CHAOS"
+      : `${chaosWave?.label || "Mixed Madness"} · ${fallingTetrominoes.length} formations`;
+}
+
+function rotateFallingTetromino(piece) {
+  const oldCenterX = piece.x + piece.width / 2;
+  const oldCenterY = piece.y + piece.height / 2;
+  piece.cells = normalizeObstacleCells(piece.cells.map(([x, y]) => [-y, x]));
+  let columns = 1;
+  let rows = 1;
+  for (const [x, y] of piece.cells) {
+    columns = Math.max(columns, x + 1);
+    rows = Math.max(rows, y + 1);
+  }
+  piece.width = columns * piece.cellSize;
+  piece.height = rows * piece.cellSize;
+  piece.x = oldCenterX - piece.width / 2;
+  piece.y = oldCenterY - piece.height / 2;
+}
+
+function rebuildTetrominoSpatialGrid() {
+  tetrominoSpatialGrid.clear();
+  for (const piece of fallingTetrominoes) {
+    const minColumn = Math.floor(piece.x / OBSTACLE_GRID_SIZE);
+    const maxColumn = Math.floor((piece.x + piece.width) / OBSTACLE_GRID_SIZE);
+    const minRow = Math.floor(piece.y / OBSTACLE_GRID_SIZE);
+    const maxRow = Math.floor((piece.y + piece.height) / OBSTACLE_GRID_SIZE);
+    for (let row = minRow; row <= maxRow; row += 1) {
+      for (let column = minColumn; column <= maxColumn; column += 1) {
+        const key = `${column}:${row}`;
+        if (!tetrominoSpatialGrid.has(key)) tetrominoSpatialGrid.set(key, []);
+        tetrominoSpatialGrid.get(key).push(piece);
+      }
+    }
+  }
+}
+
+function getTetrominoCollisionCandidates(targetBall) {
+  const minColumn = Math.floor(targetBall.x / OBSTACLE_GRID_SIZE);
+  const maxColumn = Math.floor((targetBall.x + targetBall.width) / OBSTACLE_GRID_SIZE);
+  const minRow = Math.floor(targetBall.y / OBSTACLE_GRID_SIZE);
+  const maxRow = Math.floor((targetBall.y + targetBall.height) / OBSTACLE_GRID_SIZE);
+  const candidates = new Set();
+  for (let row = minRow; row <= maxRow; row += 1) {
+    for (let column = minColumn; column <= maxColumn; column += 1) {
+      for (const piece of tetrominoSpatialGrid.get(`${column}:${row}`) || []) candidates.add(piece);
+    }
+  }
+  return candidates;
+}
+
 function updateTetrominoes() {
   const settings = getObstacleSettings();
   if (interfaceData.customization.theme === "legacy" || interfaceData.settings.obstacleDensity === "off") {
     fallingTetrominoes.length = 0;
+    tetrominoSpatialGrid.clear();
     tetrominoTargetActive = 0;
     tetrominoSpawnTimer = 0;
+    resetChaosWaveDirector();
+    updateChaosIntensityStatus();
     return;
   }
 
-  tetrominoWaveTimer += 1;
-  if (tetrominoWaveTimer >= 240) {
-    tetrominoWaveTimer = 0;
-    const waves = ["small-storm", "giant-cluster", "alternating", "mixed"];
-    tetrominoWave = waves[Math.floor(Math.random() * waves.length)];
-    const preset = settings.density;
-    tetrominoTargetActive = preset.min + Math.floor(Math.random() * (preset.max - preset.min + 1));
-  }
-  if (tetrominoTargetActive === 0) {
-    tetrominoTargetActive = settings.density.min +
-      Math.floor(Math.random() * (settings.density.max - settings.density.min + 1));
-    tetrominoWave = ["small-storm", "mixed", "alternating"][Math.floor(Math.random() * 3)];
+  const chaos = interfaceData.settings.obstacleDensity === "chaos";
+  if (chaos) {
+    updateChaosWaveDirector();
+  } else {
+    tetrominoWaveTimer += 1;
+    if (tetrominoWaveTimer >= 240) {
+      tetrominoWaveTimer = 0;
+      const waves = ["small-storm", "giant-cluster", "alternating", "mixed"];
+      tetrominoWave = waves[Math.floor(Math.random() * waves.length)];
+      const preset = settings.density;
+      tetrominoTargetActive = preset.min + Math.floor(Math.random() * (preset.max - preset.min + 1));
+    }
+    if (tetrominoTargetActive === 0) {
+      tetrominoTargetActive = settings.density.min +
+        Math.floor(Math.random() * (settings.density.max - settings.density.min + 1));
+      tetrominoWave = ["small-storm", "mixed", "alternating"][Math.floor(Math.random() * 3)];
+    }
   }
 
   const slowFactor = activeEffects.slow ? 0.55 : 1;
   tetrominoSpawnTimer += slowFactor;
   const progression = Math.max(0.72, 1 - Math.max(0, level - 1) * 0.006);
-  const spawnInterval = Math.max(3, settings.density.interval * progression * (0.72 + Math.random() * 0.56));
+  const interval = chaos ? chaosWaveInterval : settings.density.interval;
+  const burst = chaos ? chaosWaveBurst : settings.density.burst;
+  const spawnInterval = Math.max(1, interval * progression * (0.72 + Math.random() * 0.56));
   if (tetrominoSpawnTimer >= spawnInterval) {
-    const missing = Math.min(settings.density.burst, tetrominoTargetActive - fallingTetrominoes.length);
+    const missing = Math.min(burst, tetrominoTargetActive - fallingTetrominoes.length);
     if (missing > 0) {
       tetrominoSpawnTimer = 0;
-      for (let index = 0; index < missing; index += 1) spawnTetromino();
+      for (let index = 0; index < missing; index += 1) {
+        if (!spawnTetromino()) break;
+      }
     } else {
-      tetrominoSpawnTimer = Math.min(tetrominoSpawnTimer, settings.density.interval * 1.28);
+      tetrominoSpawnTimer = Math.min(tetrominoSpawnTimer, interval * 1.28);
     }
   }
 
   const speedFactor = activeEffects.slow ? 0.55 : 1;
   const effects = interfaceData.settings.tetrisEffects && !interfaceData.settings.reducedMotion;
-  const trailEnabled = effects && settings.visualIntensity > 0;
+  const trailEnabled = effects && settings.visualIntensity > 0 &&
+    (!chaos || fallingTetrominoes.length < 60);
   for (let index = fallingTetrominoes.length - 1; index >= 0; index -= 1) {
     const piece = fallingTetrominoes[index];
     piece.vy = piece.baseVy * speedFactor;
-    piece.pulse += 0.045;
+    piece.motionTick += 1;
+    piece.pulse += chaos && !interfaceData.settings.reducedMotion ? 0.08 : 0.045;
+    if (chaos && piece.chaosMotion === "drift") {
+      piece.x += piece.vx;
+      if (piece.x < 0 || piece.x + piece.width > WIDTH) piece.vx *= -1;
+      piece.x = Math.max(0, Math.min(WIDTH - piece.width, piece.x));
+    } else if (chaos && piece.chaosMotion === "wobble") {
+      piece.x += Math.sin(piece.motionTick * 0.055) * 0.8;
+      piece.x = Math.max(0, Math.min(WIDTH - piece.width, piece.x));
+    } else if (chaos && piece.chaosMotion === "bounce") {
+      piece.x += piece.direction * (1.1 + (piece.motionTick % 90) / 100);
+      if (piece.x < 0 || piece.x + piece.width > WIDTH) piece.direction *= -1;
+      piece.x = Math.max(0, Math.min(WIDTH - piece.width, piece.x));
+    } else if (chaos && piece.chaosMotion === "rotate" && piece.motionTick % 72 === 0) {
+      rotateFallingTetromino(piece);
+      piece.x = Math.max(0, Math.min(WIDTH - piece.width, piece.x));
+    }
     if (trailEnabled) {
       piece.trail.push(piece.y);
-      if (piece.trail.length > 4) piece.trail.shift();
+      if (piece.trail.length > (chaos ? 3 : 4)) piece.trail.shift();
     } else {
       piece.trail.length = 0;
     }
@@ -348,18 +603,25 @@ function updateTetrominoes() {
       createTetrominoExplosion(piece.x + piece.width / 2, HEIGHT, piece.color);
     }
   }
-  for (let missing = settings.density.min - fallingTetrominoes.length; missing > 0; missing -= 1) {
-    spawnTetromino();
+  if (!chaos) {
+    for (let missing = settings.density.min - fallingTetrominoes.length;
+      missing > 0 && fallingTetrominoes.length < MAX_CHAOS_OBSTACLES; missing -= 1) {
+      if (!spawnTetromino()) break;
+    }
   }
+  rebuildTetrominoSpatialGrid();
+  if (chaosAnnouncementTimer > 0) chaosAnnouncementTimer -= 1;
+  if (chaos) updateChaosIntensityStatus();
 }
 
 function createTetrominoExplosion(x, y, colorKey) {
   const settings = getObstacleSettings();
   if (!interfaceData.settings.tetrisEffects || !interfaceData.settings.obstacleExplosionParticles ||
-      interfaceData.settings.reducedMotion || settings.visualIntensity <= 0) return;
+      interfaceData.settings.reducedMotion || settings.visualIntensity <= 0 ||
+      tetrominoParticles.length >= MAX_TETROMINO_PARTICLES) return;
   const color = gameTheme[colorKey] || gameTheme.accent;
   const intensity = settings.visualIntensity;
-  const count = Math.round(18 * intensity);
+  const count = Math.min(Math.round(18 * intensity), MAX_TETROMINO_PARTICLES - tetrominoParticles.length);
   for (let index = 0; index < count; index += 1) {
     const particle = tetrominoParticlePool.pop() || {};
     const angle = Math.random() * Math.PI * 2;
@@ -378,7 +640,24 @@ function createTetrominoExplosion(x, y, colorKey) {
     tetrominoParticles.push(particle);
   }
   tetrominoFlashes.push({ x, y, color, life: 9, maxLife: 9 });
-  if (interfaceData.settings.cameraShake) cameraShake = Math.max(cameraShake, 0.7);
+  if (interfaceData.settings.cameraShake && !interfaceData.settings.reducedMotion) cameraShake = Math.max(cameraShake, 0.7);
+}
+
+function drawChaosAnnouncement() {
+  if (interfaceData.settings.obstacleDensity !== "chaos" || chaosAnnouncementTimer <= 0) return;
+  const isMaximum = chaosMaximumTimer > 0 || chaosMaximumPending;
+  const label = chaosWarningTimer > 0
+    ? isMaximum ? "MAXIMUM CHAOS INCOMING" : `${chaosWave?.label || "SPECIAL WAVE"} INCOMING`
+    : isMaximum ? "MAXIMUM CHAOS" : chaosWave?.label || "CHAOS WAVE";
+  ctx.save();
+  ctx.globalAlpha = interfaceData.settings.reducedMotion ? 0.9 : Math.min(1, chaosAnnouncementTimer / 20);
+  ctx.fillStyle = isMaximum ? "#ff4fe1" : gameTheme.accentSecondary;
+  ctx.textAlign = "center";
+  ctx.font = "bold 24px monospace";
+  ctx.shadowColor = ctx.fillStyle;
+  ctx.shadowBlur = interfaceData.settings.reducedMotion ? 0 : 10 * interfaceData.settings.obstacleVisualIntensity;
+  ctx.fillText(label, WIDTH / 2, 82);
+  ctx.restore();
 }
 
 function resolveTetrominoBallCollision(targetBall) {
@@ -386,7 +665,7 @@ function resolveTetrominoBallCollision(targetBall) {
   const settings = getObstacleSettings();
   const ballRight = targetBall.x + targetBall.width;
   const ballBottom = targetBall.y + targetBall.height;
-  for (const piece of fallingTetrominoes) {
+  for (const piece of getTetrominoCollisionCandidates(targetBall)) {
     if (ballRight <= piece.x || targetBall.x >= piece.x + piece.width ||
         ballBottom <= piece.y || targetBall.y >= piece.y + piece.height) continue;
     for (const [column, row] of piece.cells) {
@@ -428,6 +707,7 @@ function resolveTetrominoBallCollision(targetBall) {
 
 function drawTetrominoes() {
   const settings = getObstacleSettings();
+  drawChaosStormEffects(settings.visualIntensity);
   for (const piece of fallingTetrominoes) {
     const color = gameTheme[piece.color] || gameTheme.accent;
     if (piece.trail.length > 0) {
@@ -447,7 +727,9 @@ function drawTetrominoes() {
       ? 1
       : 0.9 + Math.sin(piece.pulse) * 0.1;
     ctx.shadowColor = color;
-    ctx.shadowBlur = interfaceData.settings.tetrisEffects ? 6 * settings.visualIntensity : 0;
+    ctx.shadowBlur = interfaceData.settings.tetrisEffects &&
+      (interfaceData.settings.obstacleDensity !== "chaos" || fallingTetrominoes.length < 60)
+      ? 6 * settings.visualIntensity : 0;
     ctx.strokeStyle = color;
     ctx.lineWidth = 1.2;
     for (const [column, row] of piece.cells) {
@@ -480,6 +762,25 @@ function drawTetrominoes() {
   }
   ctx.globalAlpha = 1;
   ctx.shadowBlur = 0;
+}
+
+function drawChaosStormEffects(visualIntensity) {
+  if (interfaceData.settings.obstacleDensity !== "chaos" ||
+      (chaosWave?.id !== "corruption" && chaosWave?.id !== "maximum") ||
+      visualIntensity <= 0) return;
+  const motion = interfaceData.settings.reducedMotion ? 0 : movingTick;
+  ctx.save();
+  ctx.globalAlpha = Math.min(0.24, visualIntensity * 0.22);
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(0, 0, 44, HEIGHT);
+  ctx.fillRect(WIDTH - 44, 0, 44, HEIGHT);
+  for (let index = 0; index < 18; index += 1) {
+    const y = (index * 39 + motion * 1.3) % HEIGHT;
+    const side = index % 2 ? WIDTH - 40 : 5;
+    ctx.fillStyle = ["#0066FF", "#00D5FF", "#FF00D4", "#9900FF"][index % 4];
+    ctx.fillRect(side, y, 12 + index % 4 * 4, 3 + index % 3 * 3);
+  }
+  ctx.restore();
 }
 
 function drawSquircleOutline(x, y, width, height) {

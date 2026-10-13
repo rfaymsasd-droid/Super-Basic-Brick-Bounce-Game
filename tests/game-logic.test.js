@@ -150,3 +150,106 @@ test('boss-rush corruption marks an invader as a repair target when no bricks ex
 
   assert.equal(context.invaders[0].corruptionRepair, true);
 });
+
+test('the obstacle catalog contains classic tetrominoes and connected shapes up to twelve cells', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'tetrominoes.js'), 'utf8');
+  const context = { console, Math, WIDTH: 900, HEIGHT: 650 };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+
+  const names = vm.runInContext('TETROMINO_SHAPES.map((shape) => shape.name)', context);
+  const sizes = vm.runInContext('[...new Set(TETROMINO_SHAPES.map((shape) => shape.cells.length))]', context);
+  for (const name of ['I', 'O', 'T', 'S', 'Z', 'J', 'L']) {
+    assert.ok(names.includes(name), `${name} tetromino is present`);
+  }
+  for (let size = 1; size <= 12; size += 1) {
+    assert.ok(sizes.includes(size), `connected ${size}-cell formations are present`);
+  }
+});
+
+test('Chaos density exceeds High while regular density targets stay unchanged', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'tetrominoes.js'), 'utf8');
+  const context = {
+    console,
+    Math,
+    WIDTH: 900,
+    HEIGHT: 650,
+    interfaceData: { settings: { obstacleDensity: 'chaos', obstacleMinSize: 20, obstacleMaxSize: 50,
+      obstacleSpeed: 1, obstacleVisualIntensity: 0.6 } }
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+
+  const chaos = vm.runInContext('getObstacleSettings().density', context);
+  const high = vm.runInContext('OBSTACLE_DENSITIES.high', context);
+  const normal = vm.runInContext('OBSTACLE_DENSITIES.normal', context);
+  assert.ok(chaos.min > high.max);
+  assert.equal(high.min, 8);
+  assert.equal(high.max, 12);
+  assert.equal(normal.min, 5);
+  assert.equal(normal.max, 8);
+});
+
+test('Chaos director warns before starting a capped Maximum Chaos wave', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'tetrominoes.js'), 'utf8');
+  const context = {
+    console,
+    Math,
+    WIDTH: 900,
+    HEIGHT: 650,
+    activeMode: 'chaos',
+    level: 1,
+    activeEffects: {},
+    interfaceData: { settings: { obstacleDensity: 'chaos', obstacleMinSize: 20, obstacleMaxSize: 50,
+      obstacleSpeed: 1, obstacleVisualIntensity: 0.6, obstacleShapeVariety: true } },
+    fallingTetrominoes: []
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  vm.runInContext('chaosIntensity = 96; chaosWave = CHAOS_WAVES[0]; updateChaosWaveDirector();', context);
+  assert.equal(vm.runInContext('chaosWarningTimer', context), 45);
+  assert.equal(vm.runInContext('chaosMaximumPending', context), true);
+  vm.runInContext('for (let tick = 0; tick < 45; tick += 1) updateChaosWaveDirector();', context);
+  assert.equal(vm.runInContext('chaosMaximumTimer', context), 210);
+  assert.equal(vm.runInContext('tetrominoTargetActive', context), 100);
+});
+
+test('Chaos spatial grid returns nearby pieces without scanning unrelated formations', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'tetrominoes.js'), 'utf8');
+  const context = { console, Math, WIDTH: 900, HEIGHT: 650 };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  vm.runInContext(`
+    fallingTetrominoes = [
+      { id: 1, x: 10, y: 10, width: 20, height: 20, cells: [[0, 0]], cellSize: 20 },
+      { id: 2, x: 700, y: 500, width: 20, height: 20, cells: [[0, 0]], cellSize: 20 }
+    ];
+    rebuildTetrominoSpatialGrid();
+  `, context);
+
+  const candidates = vm.runInContext('Array.from(getTetrominoCollisionCandidates({ x: 14, y: 14, width: 10, height: 10 }), (piece) => piece.id)', context);
+  assert.deepEqual(candidates, [1]);
+});
+
+test('turning obstacle density Off clears Chaos formations and its spatial index', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'tetrominoes.js'), 'utf8');
+  const context = {
+    console,
+    Math,
+    WIDTH: 900,
+    HEIGHT: 650,
+    activeMode: 'chaos',
+    interfaceData: { settings: { obstacleDensity: 'off', obstacleMinSize: 20, obstacleMaxSize: 50,
+      obstacleSpeed: 1, obstacleVisualIntensity: 0.6 }, customization: { theme: 'crimson' } },
+    fallingTetrominoes: [{ id: 1 }],
+    document: { getElementById: () => null },
+    tetrominoSpatialGrid: new Map([['0:0', [{ id: 1 }]]]),
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  vm.runInContext('updateTetrominoes();', context);
+
+  assert.equal(vm.runInContext('fallingTetrominoes.length', context), 0);
+  assert.equal(vm.runInContext('tetrominoSpatialGrid.size', context), 0);
+  assert.equal(vm.runInContext('chaosIntensity', context), 0);
+});

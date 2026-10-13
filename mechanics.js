@@ -159,6 +159,10 @@ function updateGameEffects() {
   if (trickShotTimer > 0) trickShotTimer -= 1;
   for (const targetBall of balls) {
     if (targetBall.trickShotTimer > 0) targetBall.trickShotTimer -= 1;
+    if (targetBall.trickShotTimer === 0 && targetBall.tetrominoRicochetStreak) {
+      targetBall.tetrominoRicochetIds = [];
+      targetBall.tetrominoRicochetStreak = 0;
+    }
   }
   if (cameraShake > 0) cameraShake *= 0.82;
   if (cameraShake < 0.15) cameraShake = 0;

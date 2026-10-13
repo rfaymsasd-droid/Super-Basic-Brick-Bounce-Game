@@ -535,6 +535,42 @@ body.legacy-experience-mode #menu-background {
   transition: color 180ms ease, text-shadow 180ms ease;
 }
 
+.chaos-level-indicator {
+  display: grid;
+  grid-template-columns: auto minmax(100px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin: 0 4px 8px;
+  color: #00D5FF;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chaos-level-indicator[hidden] {
+  display: none;
+}
+
+.chaos-level-indicator > span:last-child {
+  color: #d6e9ff;
+  text-align: right;
+}
+
+.chaos-meter-track {
+  height: 8px;
+  overflow: hidden;
+  border: 1px solid #00D5FF88;
+  border-radius: 99px;
+  background: #00000099;
+}
+
+#chaos-meter {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0066FF, #00D5FF, #FF00D4);
+  transition: width 180ms linear;
+}
+
 .ability-meter {
   display: flex;
   align-items: center;

@@ -181,6 +181,7 @@ function initializeInterface() {
   document.getElementById("obstacle-density-setting").addEventListener("change", (event) => {
     interfaceData.settings.obstacleDensity = event.target.value;
     clearTetrominoes();
+    updateChaosIntensityStatus();
     saveInterfaceData();
   });
   const corruptionIntensityInput = document.getElementById("corruption-intensity");
