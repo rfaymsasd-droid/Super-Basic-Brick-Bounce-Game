@@ -6,16 +6,21 @@ const DEFAULT_CORRUPTION_STATE = () => ({
   pressure: 0,
   timer: 0,
   triggeredThisLevel: false,
-  lastRepairBonus: 0
+  lastRepairBonus: 0,
+  survived: false
 });
 
 let corruptionState = DEFAULT_CORRUPTION_STATE();
 
+function clearCorruptionRepairTargets() {
+  for (const target of [...bricks, ...invaders]) {
+    target.corruptionRepair = false;
+  }
+}
+
 function resetCorruptionState() {
   corruptionState = DEFAULT_CORRUPTION_STATE();
-  for (const brick of bricks) {
-    brick.corruptionRepair = false;
-  }
+  clearCorruptionRepairTargets();
 }
 
 function shouldTriggerCorruptionEvent() {
@@ -27,35 +32,73 @@ function shouldTriggerCorruptionEvent() {
 }
 
 function markCorruptionRepairTargets() {
-  for (const brick of bricks) {
-    brick.corruptionRepair = false;
-  }
+  clearCorruptionRepairTargets();
   const candidates = bricks.filter((brick) => brick.type !== "indestructible" && brick.type !== "portal" && brick.type !== "chain");
-  if (!candidates.length) return;
+  if (!candidates.length) {
+    const invader = invaders.find((candidate) => !candidate.intangible);
+    if (invader) invader.corruptionRepair = true;
+    return;
+  }
   const repairCount = Math.min(3, Math.max(1, Math.ceil(candidates.length * 0.2)));
-  for (let index = 0; index < repairCount; index += 1) {
-    const chosen = candidates[Math.floor(Math.random() * candidates.length)];
-    if (chosen) chosen.corruptionRepair = true;
+  for (let index = candidates.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [candidates[index], candidates[swapIndex]] = [candidates[swapIndex], candidates[index]];
+  }
+  for (const brick of candidates.slice(0, repairCount)) {
+    brick.corruptionRepair = true;
   }
 }
 
 function triggerCorruptionSurge() {
-  if (corruptionState.active) return;
+  if (corruptionState.active || corruptionState.triggeredThisLevel) return;
   corruptionState = {
     active: true,
     stage: CORRUPTION_STAGES.warning,
-    pressure: 0.2,
-    timer: 150,
+    pressure: 0.04,
+    timer: 180,
     triggeredThisLevel: true,
-    lastRepairBonus: 0
+    lastRepairBonus: 0,
+    survived: false
   };
   markCorruptionRepairTargets();
 }
 
 function getCorruptionBoundaryY() {
-  if (!corruptionState.active) return HEIGHT + 36;
-  const pressureScale = corruptionState.stage === CORRUPTION_STAGES.warning ? 0.25 : corruptionState.pressure;
-  return HEIGHT - 52 - pressureScale * (HEIGHT - 120);
+  return 70 + corruptionState.pressure * Math.min(260, HEIGHT - 230);
+}
+
+function finishCorruptionSurge() {
+  clearCorruptionRepairTargets();
+  corruptionState.stage = CORRUPTION_STAGES.recovery;
+  corruptionState.survived = true;
+  corruptionState.timer = 180;
+  corruptionState.lastRepairBonus = 250;
+  registerBonusPoints(250);
+}
+
+function finishCorruptionRecovery() {
+  clearCorruptionRepairTargets();
+  corruptionState = { ...DEFAULT_CORRUPTION_STATE(), triggeredThisLevel: true };
+}
+
+function updateCorruptionStatus() {
+  const indicator = document.getElementById("corruption-indicator");
+  if (!indicator) return;
+  indicator.hidden = !corruptionState.active;
+  if (!corruptionState.active) return;
+  const stage = corruptionState.stage;
+  const stageLabel = stage === CORRUPTION_STAGES.warning
+    ? `Warning · ${Math.ceil(corruptionState.timer / 60)}s`
+    : stage === CORRUPTION_STAGES.active
+      ? "Advancing"
+      : "Recovery";
+  document.getElementById("corruption-stage").textContent = stageLabel;
+  const progress = Math.round(corruptionState.pressure * 100);
+  const meter = document.getElementById("corruption-meter");
+  meter.style.width = `${progress}%`;
+  const track = document.getElementById("corruption-meter-track");
+  track.setAttribute("aria-valuenow", String(progress));
+  track.setAttribute("aria-valuetext", `${stageLabel}, ${progress}% corruption`);
 }
 
 function updateCorruption() {
@@ -70,108 +113,118 @@ function updateCorruption() {
     corruptionState.timer -= 1;
     if (corruptionState.timer <= 0) {
       corruptionState.stage = CORRUPTION_STAGES.active;
-      corruptionState.timer = 200;
+      corruptionState.timer = 360;
     }
     return;
   }
 
   if (corruptionState.stage === CORRUPTION_STAGES.active) {
-    corruptionState.pressure = Math.min(1, corruptionState.pressure + 0.006 + (activeMode === "boss_rush" ? 0.002 : 0.001));
+    corruptionState.pressure = Math.min(1, corruptionState.pressure + (activeMode === "boss_rush" ? 0.0022 : 0.0018));
     corruptionState.timer -= 1;
-    if (corruptionState.pressure >= 1 || corruptionState.timer <= 0) {
-      corruptionState.stage = CORRUPTION_STAGES.recovery;
-      corruptionState.timer = 180;
-    }
+    if (corruptionState.timer <= 0) finishCorruptionSurge();
   } else if (corruptionState.stage === CORRUPTION_STAGES.recovery) {
-    corruptionState.pressure = Math.max(0, corruptionState.pressure - 0.015);
+    corruptionState.pressure = Math.max(0, corruptionState.pressure - 0.008);
     corruptionState.timer -= 1;
-    if (corruptionState.pressure <= 0.06 || corruptionState.timer <= 0) {
-      resetCorruptionState();
-      corruptionState.triggeredThisLevel = false;
+    if (corruptionState.pressure <= 0.04 || corruptionState.timer <= 0) {
+      finishCorruptionRecovery();
       return;
     }
   }
 
+  if (corruptionState.stage !== CORRUPTION_STAGES.active) return;
   const boundary = getCorruptionBoundaryY();
   for (const targetBall of balls) {
     if (targetBall.caught) continue;
     const centerY = targetBall.y + targetBall.height / 2;
-    if (centerY < boundary - 8) continue;
-    if (corruptionState.stage === CORRUPTION_STAGES.active) {
-      targetBall.y = Math.min(targetBall.y, boundary - targetBall.height - 5);
-      targetBall.vy = -Math.abs(targetBall.vy) * 0.75;
-      targetBall.vx *= 0.96;
-      if (targetBall.y < 8) targetBall.y = 8;
-    } else if (corruptionState.stage === CORRUPTION_STAGES.warning) {
-      targetBall.vy = -Math.abs(targetBall.vy) * 0.85;
-    }
+    if (centerY >= boundary) continue;
+    targetBall.y = boundary + 3;
+    targetBall.vy = Math.max(1.5, Math.abs(targetBall.vy));
   }
 }
 
 function drawCorruption() {
   if (!corruptionState.active) return;
   const intensity = Number(interfaceData?.settings?.corruptionIntensity ?? 0.5);
+  if (intensity <= 0) return;
   const boundary = getCorruptionBoundaryY();
-  const alpha = corruptionState.stage === CORRUPTION_STAGES.warning ? 0.35 : corruptionState.stage === CORRUPTION_STAGES.recovery ? 0.5 : 0.8;
+  const reducedMotion = interfaceData.settings.reducedMotion;
+  const tick = reducedMotion ? 0 : movingTick;
+  const alpha = corruptionState.stage === CORRUPTION_STAGES.warning ? 0.18 : corruptionState.stage === CORRUPTION_STAGES.recovery ? 0.35 : 0.58;
 
   ctx.save();
-  ctx.fillStyle = `rgba(0, 14, 30, ${0.2 + alpha * 0.25})`;
-  ctx.fillRect(0, boundary, WIDTH, HEIGHT - boundary);
+  ctx.globalAlpha = alpha * intensity;
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(0, 0, WIDTH, Math.max(0, boundary - 2));
 
-  const scanlines = 6 + Math.round(intensity * 10);
-  for (let row = 0; row < scanlines; row += 1) {
-    const y = boundary + row * 18 + ((movingTick * (1.2 + intensity)) % 9);
-    const glitch = Math.sin((row + movingTick * 0.5) * 0.9) * 24;
-    ctx.fillStyle = row % 2 === 0 ? "rgba(0, 213, 255, 0.18)" : "rgba(255, 0, 212, 0.12)";
-    ctx.fillRect(0, y, WIDTH, 6);
-    ctx.fillStyle = "rgba(255,255,255,0.12)";
-    ctx.fillRect((WIDTH * 0.2) + glitch, y - 2, 24, 10);
+  const scanlines = Math.max(1, Math.round(4 + intensity * 8));
+  for (let row = 0; row < scanlines && row * 18 < boundary; row += 1) {
+    const y = (row * 18 + (tick % 9)) % Math.max(1, boundary);
+    const glitch = reducedMotion ? 0 : Math.sin((row + tick * 0.5) * 0.9) * 24;
+    ctx.fillStyle = row % 2 === 0 ? "#00D5FF" : "#FF00D4";
+    ctx.fillRect(Math.max(0, WIDTH * 0.1 + glitch), y, WIDTH * 0.8, 2);
   }
 
-  for (let index = 0; index < 18 + Math.round(intensity * 20); index += 1) {
-    const x = ((index * 73) + movingTick * (2 + intensity)) % WIDTH;
-    const y = boundary + ((index * 47) % Math.max(18, HEIGHT - boundary));
-    const size = 4 + (index % 3);
-    ctx.fillStyle = index % 3 === 0 ? "#00D5FF" : index % 3 === 1 ? "#FF00D4" : "#00FFD5";
-    ctx.globalAlpha = 0.4 + intensity * 0.4;
+  const fragments = Math.round(14 + intensity * 20);
+  for (let index = 0; index < fragments; index += 1) {
+    const x = ((index * 73 + (reducedMotion ? 0 : tick * (1 + intensity))) % WIDTH + WIDTH) % WIDTH;
+    const y = ((index * 47 + (reducedMotion ? 0 : tick * 0.35)) % Math.max(1, boundary) + boundary) % Math.max(1, boundary);
+    const size = 4 + index % 5;
+    ctx.fillStyle = ["#0066FF", "#00D5FF", "#00FFD5", "#FF00D4", "#9900FF"][index % 5];
     ctx.fillRect(x, y, size, size);
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(x + 1, y + 1, Math.max(1, size - 2), Math.max(1, size - 2));
+    if (index % 3 === 0) {
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(x + 1, y + 1, Math.max(1, size - 2), Math.max(1, size - 2));
+    } else if (index % 4 === 0) {
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "10px monospace";
+      ctx.fillText(["0", "1", "X", "!", "#"][index % 5], x, y);
+    }
   }
 
-  if (corruptionState.stage === CORRUPTION_STAGES.warning || corruptionState.stage === CORRUPTION_STAGES.active) {
-    ctx.strokeStyle = "rgba(0, 213, 255, 0.8)";
+  if (corruptionState.stage !== CORRUPTION_STAGES.recovery) {
+    ctx.globalAlpha = 0.45 + intensity * 0.45;
+    ctx.strokeStyle = "#00D5FF";
     ctx.lineWidth = 2;
     ctx.beginPath();
     for (let x = 0; x <= WIDTH; x += 12) {
-      const y = boundary + Math.sin((x + movingTick * 2) * 0.14) * (8 + intensity * 18);
+      const y = boundary + Math.sin((x + tick * 2) * 0.14) * (4 + intensity * 12);
       if (x === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
     ctx.stroke();
-
-    ctx.fillStyle = corruptionState.stage === CORRUPTION_STAGES.warning ? "#00D5FF" : "#FF00D4";
-    ctx.font = "bold 16px sans-serif";
+    ctx.fillStyle = "#00D5FF";
+    ctx.font = "bold 13px monospace";
     ctx.textAlign = "center";
+    ctx.globalAlpha = 0.9;
     ctx.fillText(
       corruptionState.stage === CORRUPTION_STAGES.warning ? "WARNING: SYSTEM CORRUPTION DETECTED" : "SYSTEM CORRUPTION",
       WIDTH / 2,
-      Math.max(36, boundary - 18)
+      Math.min(28, Math.max(14, boundary - 12))
     );
   }
-
   ctx.restore();
 }
 
 function maybeAddCorruptionRepairBonus(brick) {
   if (!brick || !brick.corruptionRepair || !corruptionState.active) return;
   corruptionState.pressure = Math.max(0, corruptionState.pressure - 0.18);
-  corruptionState.lastRepairBonus = 150;
-  registerBonusPoints(150);
+  corruptionState.lastRepairBonus = 200;
+  registerBonusPoints(200);
   brick.corruptionRepair = false;
-  if (corruptionState.pressure < 0.2 && corruptionState.stage === CORRUPTION_STAGES.active) {
+  if (corruptionState.pressure < 0.12 && corruptionState.stage === CORRUPTION_STAGES.active) {
     corruptionState.stage = CORRUPTION_STAGES.recovery;
     corruptionState.timer = 120;
+    corruptionState.survived = false;
   }
+}
+
+function drawCorruptionRepairMarker(target, x = target.x, y = target.y) {
+  if (!target.corruptionRepair) return;
+  ctx.fillStyle = "#00FFD5";
+  ctx.fillRect(x + target.width - 10, y + 2, 8, 8);
+  ctx.fillStyle = "#000000";
+  ctx.font = "bold 8px monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("+", x + target.width - 6, y + 6);
 }

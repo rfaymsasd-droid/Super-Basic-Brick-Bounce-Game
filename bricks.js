@@ -128,6 +128,7 @@ function drawBricks() {
       ctx.fillRect(brick.x + brick.width / 2 - 1, brick.y + 3, 2, brick.height - 6);
       ctx.fillRect(brick.x + 9, brick.y + brick.height / 2 - 1, brick.width - 18, 2);
     }
+    drawCorruptionRepairMarker(brick);
     if (colorblind) {
       ctx.strokeStyle = gameTheme.text;
       ctx.lineWidth = 1.5;

@@ -73,6 +73,7 @@ test('corruption surge enters a warning phase and repair bricks push it back', (
     activeMode: 'campaign',
     level: 3,
     balls: [{ x: 20, y: 300, width: 12, height: 12, vx: 2, vy: 4, caught: false }],
+    invaders: [],
     bricks: [
       { x: 50, y: 120, width: 30, height: 16, type: 'normal', corruptionRepair: false },
       { x: 120, y: 120, width: 30, height: 16, type: 'normal', corruptionRepair: false },
@@ -96,5 +97,56 @@ test('corruption surge enters a warning phase and repair bricks push it back', (
   vm.runInContext('maybeAddCorruptionRepairBonus(bricks.find((brick) => brick.corruptionRepair));', context);
   const updatedState = vm.runInContext('corruptionState', context);
   assert.ok(updatedState.pressure <= 0.2);
-  assert.equal(context.bonus, 150);
+  assert.equal(context.bonus, 200);
+  assert.equal(context.bricks.filter((brick) => brick.corruptionRepair).length, 0);
+});
+
+test('corruption pushes balls down from the advancing top boundary and only triggers once per level', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'corruption.js'), 'utf8');
+  const context = {
+    console,
+    Math,
+    WIDTH: 900,
+    HEIGHT: 650,
+    movingTick: 0,
+    activeMode: 'campaign',
+    level: 3,
+    balls: [{ x: 20, y: 10, width: 12, height: 12, vx: 2, vy: -4, caught: false }],
+    bricks: [{ type: 'normal', corruptionRepair: false }],
+    interfaceData: { settings: { corruptionIntensity: 0.5, reducedMotion: false } },
+    registerBonusPoints: (points) => { context.bonus = (context.bonus || 0) + points; },
+    updateStatus: () => {}
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+
+  vm.runInContext('triggerCorruptionSurge(); corruptionState.stage = "active"; updateCorruption();', context);
+  assert.ok(context.balls[0].y > 70, 'the ball is moved below the corrupted area');
+  assert.ok(context.balls[0].vy > 0, 'the ball is redirected toward the safe paddle area');
+
+  vm.runInContext('corruptionState.stage = "active"; corruptionState.timer = 1; updateCorruption();', context);
+  assert.equal(context.bonus, 250, 'surviving the surge awards the completion bonus');
+  vm.runInContext('corruptionState.timer = 1; updateCorruption();', context);
+  assert.equal(context.bonus, 250, 'the same level cannot trigger or reward a second surge');
+});
+
+test('boss-rush corruption marks an invader as a repair target when no bricks exist', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'corruption.js'), 'utf8');
+  const context = {
+    console,
+    Math,
+    WIDTH: 900,
+    HEIGHT: 650,
+    activeMode: 'boss_rush',
+    level: 3,
+    bricks: [],
+    invaders: [{ x: 100, y: 50, width: 60, height: 40, intangible: false }],
+    balls: [],
+    registerBonusPoints: () => {}
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  vm.runInContext('triggerCorruptionSurge();', context);
+
+  assert.equal(context.invaders[0].corruptionRepair, true);
 });

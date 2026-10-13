@@ -553,6 +553,41 @@ body.legacy-experience-mode #menu-background {
   background: linear-gradient(90deg, var(--accent), var(--accent-warm));
 }
 
+.corruption-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 4px 8px;
+  color: #00D5FF;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.corruption-indicator[hidden] {
+  display: none;
+}
+
+.corruption-indicator > span {
+  min-width: 178px;
+}
+
+.corruption-meter-track {
+  height: 7px;
+  flex: 1;
+  overflow: hidden;
+  border: 1px solid #00D5FF88;
+  border-radius: 99px;
+  background: #00000099;
+}
+
+#corruption-meter {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0066FF, #00D5FF, #FF00D4);
+  transition: width 180ms linear;
+}
+
 .objective-progress {
   display: grid;
   grid-template-columns: 1fr 1fr;

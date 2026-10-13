@@ -667,6 +667,7 @@ function drawInvaders() {
   for (const invader of invaders) {
     if (invader.variant === "galactic-commander") {
       drawGalacticCommander(invader);
+      drawCorruptionRepairMarker(invader);
       continue;
     }
     const { x, y, width, height } = invader;
@@ -707,6 +708,7 @@ function drawInvaders() {
       ctx.fillText(symbols[invader.type] || "I", x + width - markerWidth / 2, y + 1);
     }
     ctx.globalAlpha = 1;
+    drawCorruptionRepairMarker(invader, x, y + idleOffset);
   }
 }
 
@@ -729,6 +731,7 @@ function updateStatus() {
   updateStatusCounter("combo", combo, (value) => `x${Math.round(value)}`);
   updateStatusCounter("bricks-left", remainingBrickTargets());
   updateStatusCounter("invaders-left", invaders.length);
+  updateCorruptionStatus();
   document.getElementById("mode").textContent = getModeName(activeMode);
   document.getElementById("world").textContent = getWorldName();
   document.getElementById("timer").textContent = activeMode === "time_attack" ? `${Math.ceil(modeTimer / 60)}s` : "";

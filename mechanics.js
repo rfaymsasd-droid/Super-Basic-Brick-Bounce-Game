@@ -241,6 +241,7 @@ function destroyBrick(index) {
 function damageInvader(index, targetBall) {
   const invader = invaders[index];
   if (!invader || invader.intangible || (invader.type !== "shield-generator" && isInvaderShielded(invader))) return;
+  if (invader.corruptionRepair) maybeAddCorruptionRepairBonus(invader);
   invader.flashTimer = 7;
   spawnParticles(targetBall.x + targetBall.width / 2, targetBall.y + targetBall.height / 2, gameTheme.enemy, 4, 1.4);
   playGameSound("enemy");

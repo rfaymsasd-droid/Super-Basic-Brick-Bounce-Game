@@ -1028,6 +1028,7 @@ function unlockAchievements() {
 function nextLevel() {
   paused = false;
   level += 1;
+  resetCorruptionState();
   initializeModeLevel();
   balls = [ball];
   ballAttached = true;
