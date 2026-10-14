@@ -228,7 +228,8 @@ test('Chaos spatial grid returns nearby pieces without scanning unrelated format
   `, context);
 
   const candidates = vm.runInContext('Array.from(getTetrominoCollisionCandidates({ x: 14, y: 14, width: 10, height: 10 }), (piece) => piece.id)', context);
-  assert.deepEqual(candidates, [1]);
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0], 1);
 });
 
 test('turning obstacle density Off clears Chaos formations and its spatial index', () => {
@@ -252,4 +253,60 @@ test('turning obstacle density Off clears Chaos formations and its spatial index
   assert.equal(vm.runInContext('fallingTetrominoes.length', context), 0);
   assert.equal(vm.runInContext('tetrominoSpatialGrid.size', context), 0);
   assert.equal(vm.runInContext('chaosIntensity', context), 0);
+});
+
+test('Chaos Overdrive includes a multi-event scheduler with at least 25 event definitions and safe overload warnings', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'chaos.js'), 'utf8');
+  const context = {
+    console,
+    Math,
+    WIDTH: 900,
+    HEIGHT: 650,
+    activeMode: 'chaos',
+    interfaceData: { settings: { obstacleDensity: 'chaos', reducedMotion: false } },
+    balls: [{ x: 100, y: 300, width: 12, height: 12, vx: 3, vy: -3, caught: false, trail: [], trickShotPieces: [] }],
+    fallingTetrominoes: [],
+    invaders: [],
+    bricks: [],
+    paddle: { x: 150, y: 580, width: 120, height: 16 },
+    paddleTargetX: 150,
+    gameTheme: { accent: '#fff', accentSecondary: '#fff', brick: '#fff', enemy: '#fff', projectile: '#fff', paddle: '#fff' },
+    playGameSound: () => {},
+    setEffect: () => {},
+    applyShockwave: () => {},
+    registerBonusPoints: () => {},
+    triggerCorruptionSurge: () => {},
+    spawnParticles: () => {},
+    dropPowerUp: () => {},
+    collectPowerUp: () => {},
+    createTetrominoExplosion: () => {},
+    createRainbowWarning: () => {},
+    document: { getElementById: () => ({ hidden: false, textContent: '', style: {} }) }
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+
+  assert.ok(vm.runInContext('CHAOS_EVENT_LIBRARY.length >= 25', context));
+  context.scheduler = vm.runInContext('createChaosScheduler();', context);
+  assert.ok(context.scheduler);
+  assert.equal(vm.runInContext('scheduler.activeEvents.length', context), 0);
+  vm.runInContext('scheduler.start(); for (let tick = 0; tick < 260; tick += 1) scheduler.tick();', context);
+  assert.ok(vm.runInContext('scheduler.activeEvents.length >= 1 || scheduler.warning !== null', context));
+  vm.runInContext('scheduler.forceOverload();', context);
+  assert.ok(vm.runInContext('scheduler.overloadTimer > 0 || scheduler.warning !== null', context));
+});
+
+test('Galaga roster includes the original nine enemies and the expanded Galaga 88 entries', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'galaga-enemies.js'), 'utf8');
+  const context = { console, Math, WIDTH: 900, HEIGHT: 650, invaders: [] };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+
+  assert.ok(vm.runInContext('GALAGA_ORIGINAL_ENEMIES.length >= 9', context));
+  assert.ok(vm.runInContext('GALAGA_88_VARIANTS.length >= 17', context));
+  assert.ok(vm.runInContext('GALAGA_REGISTRY.length >= 26', context));
+  const entry = vm.runInContext('getGalagaEnemyDefinition("zako")', context);
+  assert.equal(entry.variant, 'zako');
+  assert.equal(entry.category, 'original');
+  assert.ok(entry.health >= 1);
 });

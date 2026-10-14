@@ -56,7 +56,8 @@ function loadInterfaceData() {
       animatedGrid: true, tetrisEffects: true, obstacleDensity: "low",
       obstacleMinSize: 20, obstacleMaxSize: 50, obstacleSpeed: 1,
       obstacleVisualIntensity: 0.6, obstacleExplosionParticles: true,
-      obstacleShapeVariety: true, specialAbility: "pulse"
+      obstacleShapeVariety: true, specialAbility: "pulse",
+      chaosIntensity: "catastrophic", chaosMaxEvents: 5, chaosReducedVisualEffects: false
     }
   };
   try {
@@ -95,6 +96,9 @@ function normalizeObstacleSettings(settings) {
   };
   const minimum = Math.round(clamp(settings.obstacleMinSize, 20, 65, 20) / 5) * 5;
   const maximum = Math.max(minimum, Math.round(clamp(settings.obstacleMaxSize, 20, 65, 50) / 5) * 5);
+  const chaosIntensity = ["intense", "insane", "catastrophic", "total-chaos"].includes(settings.chaosIntensity)
+    ? settings.chaosIntensity
+    : "catastrophic";
   return {
     ...settings,
     obstacleDensity: densities.includes(settings.obstacleDensity) ? settings.obstacleDensity : "low",
@@ -108,7 +112,10 @@ function normalizeObstacleSettings(settings) {
     tetrisEffects: settings.tetrisEffects !== false,
     specialAbility: ["pulse", "overdrive", "timeWarp"].includes(settings.specialAbility)
       ? settings.specialAbility
-      : "pulse"
+      : "pulse",
+    chaosIntensity,
+    chaosMaxEvents: clamp(settings.chaosMaxEvents, 2, 8, 5),
+    chaosReducedVisualEffects: settings.chaosReducedVisualEffects === true
   };
 }
 
@@ -248,6 +255,30 @@ function initializeInterface() {
     applyCustomization();
     saveInterfaceData();
   });
+  const chaosIntensitySetting = document.getElementById("chaos-intensity-setting");
+  if (chaosIntensitySetting) {
+    chaosIntensitySetting.value = interfaceData.settings.chaosIntensity;
+    chaosIntensitySetting.addEventListener("change", (event) => {
+      interfaceData.settings.chaosIntensity = event.target.value;
+      saveInterfaceData();
+    });
+  }
+  const chaosMaxEvents = document.getElementById("chaos-max-events");
+  if (chaosMaxEvents) {
+    chaosMaxEvents.value = String(interfaceData.settings.chaosMaxEvents ?? 5);
+    chaosMaxEvents.addEventListener("input", () => {
+      interfaceData.settings.chaosMaxEvents = Number(chaosMaxEvents.value);
+      saveInterfaceData();
+    });
+  }
+  const chaosReducedVisualEffects = document.getElementById("chaos-reduced-visuals");
+  if (chaosReducedVisualEffects) {
+    chaosReducedVisualEffects.checked = Boolean(interfaceData.settings.chaosReducedVisualEffects);
+    chaosReducedVisualEffects.addEventListener("change", (event) => {
+      interfaceData.settings.chaosReducedVisualEffects = event.target.checked;
+      saveInterfaceData();
+    });
+  }
   document.getElementById("mode-select").addEventListener("change", () => {
     interfaceData.save.mode = document.getElementById("mode-select").value;
     saveInterfaceData();

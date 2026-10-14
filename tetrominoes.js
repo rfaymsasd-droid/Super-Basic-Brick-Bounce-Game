@@ -410,16 +410,24 @@ function updateChaosWaveDirector() {
 
   chaosWaveTimer -= 1;
   if (chaosWaveTimer <= 0) {
-    chaosWaveIndex = (chaosWaveIndex + 1 + Math.floor(Math.random() * (CHAOS_WAVES.length - 1))) % CHAOS_WAVES.length;
-    const nextWave = CHAOS_WAVES[chaosWaveIndex];
-    if (nextWave.id === "pixel-rain" || nextWave.id === "swarm") {
+    if (chaosIntensity >= 85 && chaosMaximumTimer === 0) {
+      chaosIntensity = 100;
+      chaosWarningTimer = 45;
+      chaosAnnouncementTimer = 45;
+      chaosMaximumPending = true;
+      chaosWaveTimer = 240;
+      return;
+    }
+    const queuedWave = CHAOS_WAVES[(chaosWaveIndex + 1 + Math.floor(Math.random() * (CHAOS_WAVES.length - 1))) % CHAOS_WAVES.length];
+    if (queuedWave.id === "pixel-rain" || queuedWave.id === "swarm") {
+      chaosWave = queuedWave;
       chaosWarningTimer = 45;
       chaosAnnouncementTimer = 45;
       chaosMaximumPending = false;
-      chaosWave = nextWave;
+      chaosWaveTimer = 180;
       return;
     }
-    startChaosWave(nextWave);
+    startChaosWave(queuedWave);
   }
 
   const active = fallingTetrominoes.length;
@@ -438,6 +446,7 @@ function updateChaosWaveDirector() {
     chaosAnnouncementTimer = 45;
     chaosMaximumPending = true;
     chaosWaveTimer = 240;
+    return;
   }
 }
 

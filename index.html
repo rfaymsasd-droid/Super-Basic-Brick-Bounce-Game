@@ -142,6 +142,19 @@
               <label><span>Explosion particles</span><input id="obstacle-explosions-setting" type="checkbox" checked></label>
               <label><span>Expanded shape variety</span><input id="obstacle-variety-setting" type="checkbox" checked></label>
             </section>
+            <section class="chaos-settings" aria-labelledby="chaos-settings-title">
+              <h3 id="chaos-settings-title">Chaos Overdrive</h3>
+              <label><span>Chaos intensity</span>
+                <select id="chaos-intensity-setting">
+                  <option value="intense">Intense</option>
+                  <option value="insane">Insane</option>
+                  <option value="catastrophic">Catastrophic</option>
+                  <option value="total-chaos">TOTAL CHAOS</option>
+                </select>
+              </label>
+              <label><span>Maximum active events</span><input id="chaos-max-events" type="range" min="2" max="8" step="1" value="5"></label>
+              <label><span>Reduced visual effects</span><input id="chaos-reduced-visuals" type="checkbox"></label>
+            </section>
             <button id="fullscreen-button" type="button">Full screen</button>
           </div>
         </section>
@@ -257,6 +270,7 @@
     </section>
 
    <script src="themes.js"></script>
+   <script src="galaga-enemies.js"></script>
    <script src="game.js"></script>
    <script src="bricks.js"></script>
    <script src="collisions.js"></script>

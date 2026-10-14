@@ -348,6 +348,11 @@ function resetChaosMode() {
     status.hidden = activeMode !== "chaos";
     status.textContent = "Chaos event: anything can happen";
   }
+  if (typeof createChaosScheduler === "function") {
+    chaosScheduler = createChaosScheduler();
+    chaosScheduler.start();
+    if (status) status.textContent = "Chaos event: SYSTEM ONLINE";
+  }
 }
 
 function updateChaosMode() {
@@ -357,6 +362,14 @@ function updateChaosMode() {
     return;
   }
   if (status) status.hidden = false;
+
+  if (typeof chaosScheduler?.tick === "function") {
+    chaosScheduler.tick();
+    if (status && !chaosScheduler.warning && chaosScheduler.activeEvents.length === 0 && chaosEventLabelTimer <= 0) {
+      status.textContent = "Chaos event: SYSTEM ONLINE";
+    }
+    return;
+  }
 
   if (chaosGravityTimer > 0 && --chaosGravityTimer === 0) gravityField = null;
   if (chaosEventLabelTimer > 0 && --chaosEventLabelTimer === 0 && status) {

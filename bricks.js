@@ -202,6 +202,13 @@ function makeInvaders(level = 1, seed = 0) {
     }
   }
 
+  if (activeMode === "campaign" || activeMode === "classic" || activeMode === "boss_rush") {
+    const galagaShifts = buildGalagaSpawnQueue(level, seed || 0);
+    if (galagaShifts.length > 0) {
+      list.push(...galagaShifts);
+    }
+  }
+
   return list;
 }
 

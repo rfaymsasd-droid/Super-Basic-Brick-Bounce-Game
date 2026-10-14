@@ -383,6 +383,12 @@ function moveInvaders() {
   }
 
   for (const invader of invaders) {
+    if (invader.galaga) {
+      const drift = Math.sin((movingTick + invader.galagaPhase) / 16) * 0.8;
+      invader.x += (invaderDirection * speed * 0.8) + drift;
+      invader.y += Math.cos((movingTick + invader.galagaPhase) / 18) * 0.35;
+      continue;
+    }
     const typeMultiplier = invader.type === "scout" ? 1.8 : invader.type === "boss" && invader.phase > 1 ? 1.5 : invader.small ? 1.5 : 1;
     invader.x += invaderDirection * speed * typeMultiplier;
   }
@@ -692,6 +698,11 @@ function drawInvaders() {
   for (const invader of invaders) {
     if (invader.variant === "galactic-commander") {
       drawGalacticCommander(invader);
+      drawCorruptionRepairMarker(invader);
+      continue;
+    }
+    if (invader.galaga) {
+      drawGalagaEnemy(invader);
       drawCorruptionRepairMarker(invader);
       continue;
     }

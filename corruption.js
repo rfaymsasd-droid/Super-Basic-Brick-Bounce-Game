@@ -13,8 +13,10 @@ const DEFAULT_CORRUPTION_STATE = () => ({
 let corruptionState = DEFAULT_CORRUPTION_STATE();
 
 function clearCorruptionRepairTargets() {
-  for (const target of [...bricks, ...invaders]) {
-    target.corruptionRepair = false;
+  const invaderTargets = typeof invaders === "undefined" ? [] : invaders;
+  const repairTargets = [...(Array.isArray(bricks) ? bricks : []), ...(Array.isArray(invaderTargets) ? invaderTargets : [])];
+  for (const target of repairTargets) {
+    if (target) target.corruptionRepair = false;
   }
 }
 
@@ -33,9 +35,11 @@ function shouldTriggerCorruptionEvent() {
 
 function markCorruptionRepairTargets() {
   clearCorruptionRepairTargets();
-  const candidates = bricks.filter((brick) => brick.type !== "indestructible" && brick.type !== "portal" && brick.type !== "chain");
+  const bricksList = Array.isArray(bricks) ? bricks : [];
+  const invaderList = typeof invaders === "undefined" ? [] : (Array.isArray(invaders) ? invaders : []);
+  const candidates = bricksList.filter((brick) => brick && brick.type !== "indestructible" && brick.type !== "portal" && brick.type !== "chain");
   if (!candidates.length) {
-    const invader = invaders.find((candidate) => !candidate.intangible);
+    const invader = invaderList.find((candidate) => candidate && !candidate.intangible);
     if (invader) invader.corruptionRepair = true;
     return;
   }
