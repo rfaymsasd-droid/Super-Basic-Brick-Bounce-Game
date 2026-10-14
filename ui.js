@@ -1,4 +1,26 @@
 const UI_STORAGE_KEY = "brickBounceInterface";
+const DEFAULT_KEYBINDS = {
+  moveLeft: "ArrowLeft",
+  moveRight: "ArrowRight",
+  alternateLeft: "KeyA",
+  alternateRight: "KeyD",
+  launch: "Space",
+  pause: "KeyP",
+  restart: "KeyR",
+  ability: "KeyE",
+  laser: "KeyF"
+};
+const KEYBIND_ACTIONS = [
+  ["moveLeft", "Move left / Player 1 left"],
+  ["moveRight", "Move right / Player 1 right"],
+  ["alternateLeft", "Alternate left / Player 2 left"],
+  ["alternateRight", "Alternate right / Player 2 right"],
+  ["launch", "Launch ball"],
+  ["pause", "Pause"],
+  ["restart", "Restart"],
+  ["ability", "Special ability"],
+  ["laser", "Fire laser"]
+];
 const ACHIEVEMENTS = [
   { id: "first-brick", title: "First Break", description: "Destroy your first brick.", goal: 1, stat: "bricksDestroyed" },
   { id: "brick-100", title: "Demolition Crew", description: "Destroy 100 bricks.", goal: 100, stat: "bricksDestroyed" },
@@ -42,6 +64,37 @@ let themePreviewActive = false;
 let themePreviewFadeTimer = 0;
 let customThemeDirty = false;
 let themeBeforeDraft;
+let pendingKeybindAction = "";
+let pendingKeybindButton = null;
+
+function normalizeKeybinds(candidate = {}) {
+  const validCodes = /^(Key[A-Z]|Digit[0-9]|Numpad[0-9]|Arrow(Left|Right|Up|Down)|Space|Enter|Backspace|Delete|Home|End|PageUp|PageDown|Insert|F([1-9]|1[0-2]))$/;
+  const normalized = {};
+  const usedCodes = new Set();
+  for (const [action, defaultCode] of Object.entries(DEFAULT_KEYBINDS)) {
+    const candidateCode = candidate?.[action];
+    const code = typeof candidateCode === "string" && validCodes.test(candidateCode) && !usedCodes.has(candidateCode)
+      ? candidateCode
+      : usedCodes.has(defaultCode)
+        ? Object.values(DEFAULT_KEYBINDS).find((fallback) => !usedCodes.has(fallback))
+        : defaultCode;
+    normalized[action] = code;
+    usedCodes.add(code);
+  }
+  return normalized;
+}
+
+function getKeybind(action) {
+  return interfaceData.settings.keybinds[action] || DEFAULT_KEYBINDS[action];
+}
+
+function getKeybindLabel(action) {
+  return getKeybind(action)
+    .replace(/^Arrow/, "")
+    .replace(/^Key/, "")
+    .replace(/^Digit/, "")
+    .replace(/^Numpad/, "Num ");
+}
 
 function loadInterfaceData() {
   const defaults = {
@@ -57,7 +110,8 @@ function loadInterfaceData() {
       obstacleMinSize: 20, obstacleMaxSize: 50, obstacleSpeed: 1,
       obstacleVisualIntensity: 0.6, obstacleExplosionParticles: true,
       obstacleShapeVariety: true, specialAbility: "pulse",
-      chaosIntensity: "catastrophic", chaosMaxEvents: 5, chaosReducedVisualEffects: false
+      chaosIntensity: "catastrophic", chaosMaxEvents: 5, chaosReducedVisualEffects: false,
+      keybinds: { ...DEFAULT_KEYBINDS }
     }
   };
   try {
@@ -115,7 +169,8 @@ function normalizeObstacleSettings(settings) {
       : "pulse",
     chaosIntensity,
     chaosMaxEvents: clamp(settings.chaosMaxEvents, 2, 8, 5),
-    chaosReducedVisualEffects: settings.chaosReducedVisualEffects === true
+    chaosReducedVisualEffects: settings.chaosReducedVisualEffects === true,
+    keybinds: normalizeKeybinds(settings.keybinds)
   };
 }
 
@@ -139,6 +194,12 @@ function initializeInterface() {
   buildCustomizationOptions();
   buildThemeInterface();
   applyCustomization();
+  renderKeybinds();
+  syncKeybindHints();
+  for (const button of document.querySelectorAll("[data-keybind]")) {
+    button.addEventListener("click", () => startKeybindCapture(button));
+  }
+  document.getElementById("reset-keybinds").addEventListener("click", resetKeybinds);
   document.getElementById("main-menu").addEventListener("click", handleMenuClick);
   document.getElementById("panel-root").addEventListener("click", handlePanelClick);
   document.getElementById("game-over-panel").addEventListener("click", handleResultClick);
@@ -284,6 +345,7 @@ function initializeInterface() {
     saveInterfaceData();
   });
   document.addEventListener("keydown", handleThemeKeyboard, { capture: true });
+  document.addEventListener("keydown", captureKeybind, { capture: true });
   document.addEventListener("fullscreenchange", updateFullscreenButton);
   window.addEventListener("blur", () => {
     if (gameActive && !paused && !gameOver) pauseGame();
@@ -560,6 +622,74 @@ function handleThemeKeyboard(event) {
     event.preventDefault();
     first.focus();
   }
+}
+
+function renderKeybinds() {
+  for (const button of document.querySelectorAll("[data-keybind]")) {
+    const action = button.dataset.keybind;
+    button.textContent = getKeybindLabel(action);
+    button.setAttribute("aria-label", `Change ${KEYBIND_ACTIONS.find(([id]) => id === action)?.[1] || action} key`);
+  }
+}
+
+function syncKeybindHints() {
+  const movement = `${getKeybindLabel("moveLeft")} / ${getKeybindLabel("moveRight")}`;
+  const alternate = `${getKeybindLabel("alternateLeft")} / ${getKeybindLabel("alternateRight")}`;
+  document.querySelector(".menu-hint").textContent = `MOVE ${movement} · ${alternate} · ${getKeybindLabel("launch")} LAUNCH · ${getKeybindLabel("pause")} PAUSE`;
+  document.getElementById("game-instructions").textContent = `Move: ${movement} or ${alternate}; co-op Player 2: ${alternate}. Launch: ${getKeybindLabel("launch")}; ability: ${getKeybindLabel("ability")}; pause: ${getKeybindLabel("pause")} or Escape; restart: ${getKeybindLabel("restart")}; laser: ${getKeybindLabel("laser")}. Mouse, touch, and controller are also supported.`;
+}
+
+function startKeybindCapture(button) {
+  if (pendingKeybindButton) {
+    pendingKeybindButton.textContent = getKeybindLabel(pendingKeybindAction);
+    pendingKeybindButton.setAttribute("aria-pressed", "false");
+  }
+  pendingKeybindAction = button.dataset.keybind;
+  pendingKeybindButton = button;
+  button.textContent = "Press a key";
+  button.setAttribute("aria-pressed", "true");
+  document.getElementById("keybind-status").textContent = "Press a key to assign. Escape cancels.";
+}
+
+function finishKeybindCapture(message) {
+  if (pendingKeybindButton) pendingKeybindButton.setAttribute("aria-pressed", "false");
+  pendingKeybindAction = "";
+  pendingKeybindButton = null;
+  renderKeybinds();
+  document.getElementById("keybind-status").textContent = message;
+}
+
+function captureKeybind(event) {
+  if (!pendingKeybindAction) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if (event.code === "Escape") {
+    finishKeybindCapture("Key assignment canceled.");
+    return;
+  }
+  const validCodes = /^(Key[A-Z]|Digit[0-9]|Numpad[0-9]|Arrow(Left|Right|Up|Down)|Space|Enter|Backspace|Delete|Home|End|PageUp|PageDown|Insert|F([1-9]|1[0-2]))$/;
+  if (!validCodes.test(event.code)) {
+    document.getElementById("keybind-status").textContent = "Choose a letter, number, arrow, Space, or function key.";
+    return;
+  }
+  const conflict = KEYBIND_ACTIONS.find(([action]) => action !== pendingKeybindAction && getKeybind(action) === event.code);
+  if (conflict) {
+    document.getElementById("keybind-status").textContent = `${conflict[1]} already uses that key.`;
+    return;
+  }
+  interfaceData.settings.keybinds[pendingKeybindAction] = event.code;
+  saveInterfaceData();
+  syncKeybindHints();
+  finishKeybindCapture(`${KEYBIND_ACTIONS.find(([action]) => action === pendingKeybindAction)[1]} updated.`);
+}
+
+function resetKeybinds() {
+  if (pendingKeybindButton) finishKeybindCapture("Default keys restored.");
+  interfaceData.settings.keybinds = { ...DEFAULT_KEYBINDS };
+  saveInterfaceData();
+  renderKeybinds();
+  syncKeybindHints();
+  document.getElementById("keybind-status").textContent = "Default keys restored.";
 }
 
 function startThemePreview() {
@@ -878,6 +1008,8 @@ function renderStatistics() {
 }
 
 function renderSettings() {
+  renderKeybinds();
+  syncKeybindHints();
   document.getElementById("sound-setting").checked = interfaceData.settings.sound;
   document.getElementById("music-setting").checked = interfaceData.settings.music;
   document.getElementById("camera-shake-setting").checked = interfaceData.settings.cameraShake;

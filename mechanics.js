@@ -322,7 +322,7 @@ function updateMechanics() {
   updateFallingPowerUps();
   updateLaserShots();
   if (laserCooldown > 0) laserCooldown -= 1;
-  if (keys["f"] && activeEffects.laser && laserCooldown === 0) fireLaser();
+  if (keys[getKeybind("laser")] && activeEffects.laser && laserCooldown === 0) fireLaser();
   for (const [id, effect] of Object.entries(activeEffects)) {
     effect.remaining -= 1;
     if (effect.remaining <= 0) removeEffect(id);

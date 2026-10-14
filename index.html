@@ -103,6 +103,7 @@
             <p>Gamemodes - idonotknowhowtocode</p>
             <p>Chaos Mode - idonotknowhowtocode</p>
             <p>Variants - Isneed-eng</p>
+            <p>Keybinds - idonotknowhowtocode</p>
           </div>
         </section>
 
@@ -111,6 +112,24 @@
           <p class="eyebrow">TUNE YOUR EXPERIENCE</p>
           <h2>Settings</h2>
           <div class="settings-list">
+            <section class="keybind-settings" aria-labelledby="keybind-settings-title">
+              <h3 id="keybind-settings-title">Keyboard Controls</h3>
+              <div class="keybind-list">
+                <div class="keybind-row"><span>Move left / Player 1 left</span><button type="button" data-keybind="moveLeft"></button></div>
+                <div class="keybind-row"><span>Move right / Player 1 right</span><button type="button" data-keybind="moveRight"></button></div>
+                <div class="keybind-row"><span>Alternate left / Player 2 left</span><button type="button" data-keybind="alternateLeft"></button></div>
+                <div class="keybind-row"><span>Alternate right / Player 2 right</span><button type="button" data-keybind="alternateRight"></button></div>
+                <div class="keybind-row"><span>Launch ball</span><button type="button" data-keybind="launch"></button></div>
+                <div class="keybind-row"><span>Pause</span><button type="button" data-keybind="pause"></button></div>
+                <div class="keybind-row"><span>Restart</span><button type="button" data-keybind="restart"></button></div>
+                <div class="keybind-row"><span>Special ability</span><button type="button" data-keybind="ability"></button></div>
+                <div class="keybind-row"><span>Fire laser</span><button type="button" data-keybind="laser"></button></div>
+              </div>
+              <div class="keybind-actions">
+                <button id="reset-keybinds" type="button">Reset keys</button>
+                <span id="keybind-status" role="status" aria-live="polite"></span>
+              </div>
+            </section>
             <label><span>Sound effects</span><input id="sound-setting" type="checkbox" checked></label>
             <label class="range-setting"><span>Effects volume <output id="effects-volume-value" for="effects-volume">70%</output></span><input id="effects-volume" type="range" min="0" max="1" step="0.05" value="0.7"></label>
             <label><span>Music</span><input id="music-setting" type="checkbox" checked></label>

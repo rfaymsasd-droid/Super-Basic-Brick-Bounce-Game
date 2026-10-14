@@ -96,13 +96,12 @@ function unlockAudio() {
 }
 
 document.addEventListener("keydown", function (event) {
-  const key = event.key.toLowerCase();
   const interactiveFocus = event.target.closest?.("button, input, select, textarea, a");
   if (interactiveFocus && event.code !== "Escape") return;
-  keys[key] = true;
+  keys[event.code] = true;
   if (!event.repeat) unlockAudio();
 
-  if (event.code === "Space") {
+  if (event.code === getKeybind("launch")) {
     if (event.target !== canvas && event.target !== document.body) return;
     event.preventDefault();
     if (!event.repeat && !paused && !gameOver && gameActive && galacticBossDefeatTimer === 0) {
@@ -110,23 +109,23 @@ document.addEventListener("keydown", function (event) {
       started = true;
       launchBall();
     }
-  } else if (key === "r" && !event.repeat && (gameActive || gameOver)) {
+  } else if (event.code === getKeybind("restart") && !event.repeat && (gameActive || gameOver)) {
     resetGame();
     beginGame(false);
-  } else if (key === "e" && !event.repeat && gameActive && galacticBossDefeatTimer === 0) {
+  } else if (event.code === getKeybind("ability") && !event.repeat && gameActive && galacticBossDefeatTimer === 0) {
     activateSpecialAbility();
-  } else if ((key === "p" || key === "escape") && !event.repeat && !gameOver && gameActive) {
+  } else if ((event.code === getKeybind("pause") || event.code === "Escape") && !event.repeat && !gameOver && gameActive) {
     if (paused) resumeGame();
     else pauseGame();
   }
 
-  if (event.key.startsWith("Arrow")) {
+  if (event.code.startsWith("Arrow")) {
     event.preventDefault();
   }
 });
 
 document.addEventListener("keyup", function (event) {
-  keys[event.key.toLowerCase()] = false;
+  keys[event.code] = false;
 });
 document.addEventListener("click", function () {
   unlockAudio();
@@ -289,18 +288,18 @@ function updateGamepad() {
 function movePaddle() {
   const speed = paddle.speed * (activeEffects.slow ? 0.7 : 1);
   if (activeMode === "coop") {
-    if (keys["arrowleft"]) paddleTargetX -= speed;
-    if (keys["arrowright"]) paddleTargetX += speed;
-    if (keys["a"]) secondPaddleTargetX -= speed;
-    if (keys["d"]) secondPaddleTargetX += speed;
+    if (keys[getKeybind("moveLeft")]) paddleTargetX -= speed;
+    if (keys[getKeybind("moveRight")]) paddleTargetX += speed;
+    if (keys[getKeybind("alternateLeft")]) secondPaddleTargetX -= speed;
+    if (keys[getKeybind("alternateRight")]) secondPaddleTargetX += speed;
     paddleTargetX = Math.max(0, Math.min(WIDTH / 2 - paddle.width, paddleTargetX));
     secondPaddleTargetX = Math.max(WIDTH / 2, Math.min(WIDTH - secondPaddle.width, secondPaddleTargetX));
     paddle.x += (paddleTargetX - paddle.x) * 0.72;
     secondPaddle.x += (secondPaddleTargetX - secondPaddle.x) * 0.72;
     return;
   }
-  if (keys["arrowleft"] || keys["a"]) paddleTargetX -= speed;
-  if (keys["arrowright"] || keys["d"]) paddleTargetX += speed;
+  if (keys[getKeybind("moveLeft")] || keys[getKeybind("alternateLeft")]) paddleTargetX -= speed;
+  if (keys[getKeybind("moveRight")] || keys[getKeybind("alternateRight")]) paddleTargetX += speed;
   paddleTargetX = Math.max(0, Math.min(WIDTH - paddle.width, paddleTargetX));
   paddle.x += (paddleTargetX - paddle.x) * 0.72;
 }

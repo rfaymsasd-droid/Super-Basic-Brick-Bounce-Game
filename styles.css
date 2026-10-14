@@ -358,6 +358,54 @@ select {
   gap: 18px;
 }
 
+.keybind-settings {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #ffffff1c;
+}
+
+.keybind-settings h3 {
+  margin: 0;
+  color: var(--accent-warm);
+  font-size: 16px;
+}
+
+.keybind-list {
+  display: grid;
+  gap: 6px;
+}
+
+.keybind-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  color: #c1c9e2;
+  font-size: 13px;
+}
+
+.keybind-row button {
+  min-width: 88px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.keybind-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+#keybind-status {
+  min-height: 1.4em;
+  color: #aab3d0;
+  font-size: 12px;
+}
+
 #legacy-experience[hidden] {
   display: none !important;
 }
