@@ -518,6 +518,14 @@ body.legacy-experience-mode #menu-background {
   padding: 10px 0 24px;
 }
 
+#game-shell:fullscreen {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  padding: 20px clamp(16px, 4vw, 48px);
+  background: var(--background);
+}
+
 .game-header {
   display: flex;
   flex-wrap: wrap;

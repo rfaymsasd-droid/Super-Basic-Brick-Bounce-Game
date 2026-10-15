@@ -208,7 +208,7 @@ function initializeInterface() {
   document.getElementById("fullscreen-button").addEventListener("click", toggleFullscreen);
   document.getElementById("return-modern-button").addEventListener("click", returnToModernExperience);
   document.getElementById("settings-themes-button").addEventListener("click", () => openThemes("settings-screen"));
-  document.getElementById("game-fullscreen-button").addEventListener("click", toggleFullscreen);
+  document.getElementById("game-fullscreen-button").addEventListener("click", () => toggleFullscreen(document.getElementById("game-shell")));
   document.getElementById("pause-button").addEventListener("click", pauseGame);
   document.getElementById("launch-button").addEventListener("click", () => {
     if (!gameActive || paused || gameOver || galacticBossDefeatTimer > 0) return;
@@ -1203,8 +1203,7 @@ function nextLevel() {
   updateStatus();
 }
 
-function toggleFullscreen() {
-  const target = document.documentElement;
+function toggleFullscreen(target = document.documentElement) {
   const request = target.requestFullscreen?.bind(target);
   const exit = document.exitFullscreen?.bind(document);
   const operation = document.fullscreenElement ? exit?.() : request?.();
@@ -1212,7 +1211,9 @@ function toggleFullscreen() {
 }
 
 function updateFullscreenButton() {
-  document.getElementById("fullscreen-button").textContent = document.fullscreenElement ? "Exit full screen" : "Full screen";
+  const label = document.fullscreenElement ? "Exit full screen" : "Full screen";
+  document.getElementById("fullscreen-button").textContent = label;
+  document.getElementById("game-fullscreen-button").textContent = label;
 }
 
 function startMenuBackground() {

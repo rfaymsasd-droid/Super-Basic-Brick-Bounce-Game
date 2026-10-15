@@ -54,6 +54,32 @@ test('separated contacts can register fresh hits again', () => {
   assert.equal(ball.hitCounter, 2, 'A fresh collision after separation should count as another valid hit');
 });
 
+test('invader bullets disappear on ball contact without changing ball movement', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'game.js'), 'utf8');
+  const functionSource = source.match(/function updateInvaderBullets\(\) \{[\s\S]*?\n\}/)[0];
+  const ball = { x: 20, y: 30, width: 12, height: 12, vx: 3, vy: -4 };
+  const bullet = { x: 22, y: 32, width: 4, height: 8, vx: 0, vy: 0 };
+  const context = {
+    HEIGHT: 600,
+    WIDTH: 400,
+    activeEffects: {},
+    balls: [ball],
+    invaderBullets: [bullet],
+    boxesTouch: (first, second) => !(first.x + first.width <= second.x || first.x >= second.x + second.width ||
+      first.y + first.height <= second.y || first.y >= second.y + second.height),
+    getPaddles: () => [],
+    loseLife: () => assert.fail('Ball contact should not cost a life')
+  };
+  vm.createContext(context);
+  vm.runInContext(functionSource, context);
+
+  const originalBall = { ...ball };
+  context.updateInvaderBullets();
+
+  assert.equal(context.invaderBullets.length, 0);
+  assert.deepEqual(ball, originalBall);
+});
+
 test('service worker keeps legacy and modern caches isolated', () => {
   const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'service-worker.js'), 'utf8');
 

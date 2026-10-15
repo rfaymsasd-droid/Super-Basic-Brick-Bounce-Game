@@ -442,6 +442,11 @@ function updateInvaderBullets() {
       continue;
     }
 
+    if (balls.some((targetBall) => boxesTouch(bullet, targetBall))) {
+      invaderBullets.splice(bulletIndex, 1);
+      continue;
+    }
+
     if (getPaddles().some((targetPaddle) => boxesTouch(bullet, targetPaddle))) {
       invaderBullets.splice(bulletIndex, 1);
       loseLife();
