@@ -80,6 +80,42 @@ test('invader bullets disappear on ball contact without changing ball movement',
   assert.deepEqual(ball, originalBall);
 });
 
+test('fungal corruption starts after one minute and spreads to neighboring pixels', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'game.js'), 'utf8');
+  const functionSource = source.match(/function updateFungalCorruption\(\) \{[\s\S]*?\n\}/)[0];
+  const randomValues = [0.1, 0.2, 0.4, 0.7, 0.9, 0.3];
+  let randomIndex = 0;
+  const context = {
+    FUNGAL_CORRUPTION_DELAY: 3600,
+    Math: Object.create(Math),
+    gameOver: false,
+    campaignComplete: false,
+    dailyComplete: false,
+    fungalCorruption: {
+      elapsedTicks: 0,
+      active: false,
+      columns: 8,
+      rows: 8,
+      infected: new Uint8Array(64),
+      frontier: [],
+      infectedCount: 0
+    }
+  };
+  context.Math.random = () => {
+    const value = randomValues[randomIndex % randomValues.length];
+    randomIndex += 1;
+    return value;
+  };
+  vm.createContext(context);
+  vm.runInContext(functionSource, context);
+
+  for (let tick = 0; tick < 3599; tick += 1) context.updateFungalCorruption();
+  assert.equal(context.fungalCorruption.active, false);
+  context.updateFungalCorruption();
+  assert.equal(context.fungalCorruption.active, true);
+  assert.ok(context.fungalCorruption.infectedCount > 1);
+});
+
 test('service worker keeps legacy and modern caches isolated', () => {
   const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'service-worker.js'), 'utf8');
 

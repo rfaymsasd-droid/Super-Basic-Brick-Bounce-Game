@@ -14,6 +14,8 @@ const INVADER_HEIGHT = 20;
 const INVADER_GAP_X = 24;
 const INVADER_GAP_Y = 18;
 const INVADER_BULLET_SPEED = 3.5;
+const FUNGAL_CORRUPTION_DELAY = 60 * 60;
+const FUNGAL_CELL_SIZE = 4;
 
 const ball = {
   x: 0,
@@ -45,6 +47,7 @@ let invaders = [];
 let invaderBullets = [];
 let invaderDirection = 1;
 let invaderFireTimer = 0;
+let fungalCorruption = createFungalCorruptionState();
 let ballAttached = true;
 let balls = [ball];
 let started = false;
@@ -187,6 +190,8 @@ function update() {
     return;
   }
 
+  updateFungalCorruption();
+
   if (activeMode === "time_attack") {
     modeTimer -= 1;
     if (modeTimer <= 0) {
@@ -250,6 +255,64 @@ function advanceBallWithCollisionChecks(targetBall) {
     bounceOffBricks(targetBall);
     bounceOffInvaders(targetBall);
     if (targetBall.y > HEIGHT) return;
+  }
+}
+
+function createFungalCorruptionState() {
+  const columns = Math.ceil(WIDTH / FUNGAL_CELL_SIZE);
+  const rows = Math.ceil(HEIGHT / FUNGAL_CELL_SIZE);
+  return {
+    elapsedTicks: 0,
+    active: false,
+    columns,
+    rows,
+    infected: new Uint8Array(columns * rows),
+    frontier: [],
+    infectedCount: 0
+  };
+}
+
+function updateFungalCorruption() {
+  if (gameOver || campaignComplete || dailyComplete) return;
+
+  if (!fungalCorruption.active) {
+    fungalCorruption.elapsedTicks += 1;
+    if (fungalCorruption.elapsedTicks < FUNGAL_CORRUPTION_DELAY) return;
+
+    fungalCorruption.active = true;
+    const seedX = Math.floor(fungalCorruption.columns / 2);
+    const seedY = Math.floor(fungalCorruption.rows / 2);
+    const seedIndex = seedY * fungalCorruption.columns + seedX;
+    fungalCorruption.infected[seedIndex] = 1;
+    fungalCorruption.frontier.push(seedIndex);
+    fungalCorruption.infectedCount = 1;
+  }
+
+  for (let growth = 0; growth < 2 && fungalCorruption.frontier.length > 0; growth += 1) {
+    const frontierIndex = Math.floor(Math.random() * fungalCorruption.frontier.length);
+    const cellIndex = fungalCorruption.frontier[frontierIndex];
+    const cellX = cellIndex % fungalCorruption.columns;
+    const cellY = Math.floor(cellIndex / fungalCorruption.columns);
+    let spread = false;
+
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const nextX = cellX + Math.floor(Math.random() * 3) - 1;
+      const nextY = cellY + Math.floor(Math.random() * 3) - 1;
+      if (nextX < 0 || nextX >= fungalCorruption.columns || nextY < 0 || nextY >= fungalCorruption.rows) continue;
+      const nextIndex = nextY * fungalCorruption.columns + nextX;
+      if (fungalCorruption.infected[nextIndex]) continue;
+
+      fungalCorruption.infected[nextIndex] = 1;
+      fungalCorruption.frontier.push(nextIndex);
+      fungalCorruption.infectedCount += 1;
+      spread = true;
+      break;
+    }
+
+    if (!spread) {
+      fungalCorruption.frontier[frontierIndex] = fungalCorruption.frontier[fungalCorruption.frontier.length - 1];
+      fungalCorruption.frontier.pop();
+    }
   }
 }
 
@@ -679,6 +742,31 @@ function draw() {
     ctx.fillText(prompt, WIDTH / 2, HEIGHT / 2 + 28);
   }
   drawChaosAnnouncement();
+  drawFungalCorruption();
+}
+
+function drawFungalCorruption() {
+  if (!fungalCorruption.active) return;
+
+  ctx.save();
+  ctx.fillStyle = "#000000";
+  for (let row = 0; row < fungalCorruption.rows; row += 1) {
+    let runStart = -1;
+    for (let column = 0; column <= fungalCorruption.columns; column += 1) {
+      const infected = column < fungalCorruption.columns && fungalCorruption.infected[row * fungalCorruption.columns + column];
+      if (infected && runStart < 0) runStart = column;
+      if (!infected && runStart >= 0) {
+        ctx.fillRect(
+          runStart * FUNGAL_CELL_SIZE,
+          row * FUNGAL_CELL_SIZE,
+          (column - runStart) * FUNGAL_CELL_SIZE,
+          FUNGAL_CELL_SIZE
+        );
+        runStart = -1;
+      }
+    }
+  }
+  ctx.restore();
 }
 
 function drawPaddle(targetPaddle) {
@@ -911,6 +999,7 @@ function resetGame() {
   modeTimer = 120 * 60;
   dailySeed = getDailySeed();
   invaderBullets = [];
+  fungalCorruption = createFungalCorruptionState();
   invaderDirection = 1;
   invaderFireTimer = 0;
   paddle.width = 72;
