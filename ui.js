@@ -66,6 +66,8 @@ let customThemeDirty = false;
 let themeBeforeDraft;
 let pendingKeybindAction = "";
 let pendingKeybindButton = null;
+let ascensionBranch = "ballistics";
+let selectedUpgradeId = "";
 
 function normalizeKeybinds(candidate = {}) {
   const validCodes = /^(Key[A-Z]|Digit[0-9]|Numpad[0-9]|Arrow(Left|Right|Up|Down)|Space|Enter|Backspace|Delete|Home|End|PageUp|PageDown|Insert|F([1-9]|1[0-2]))$/;
@@ -100,6 +102,7 @@ function loadInterfaceData() {
   const defaults = {
     save: { mode: "campaign", level: 1, score: 0 },
     stats: { gamesPlayed: 0, bricksDestroyed: 0, targetsHit: 0, launches: 0, misses: 0, highestLevel: 1, bestScore: 0, campaignComplete: false },
+    progression: UpgradeManager.createState(),
     achievements: [],
     customization: { ball: "classic", paddle: "classic", theme: "crimson", modernTheme: "crimson", trail: "comet" },
     customTheme: { ...THEME_PRESETS.crimson, id: "custom", name: "Custom Theme" },
@@ -121,6 +124,7 @@ function loadInterfaceData() {
       ...stored,
       save: { ...defaults.save, ...stored.save },
       stats: { ...defaults.stats, ...stored.stats },
+      progression: UpgradeManager.normalize(stored.progression || defaults.progression),
       customization: {
         ...defaults.customization,
         ...stored.customization,
@@ -202,6 +206,12 @@ function initializeInterface() {
   document.getElementById("reset-keybinds").addEventListener("click", resetKeybinds);
   document.getElementById("main-menu").addEventListener("click", handleMenuClick);
   document.getElementById("panel-root").addEventListener("click", handlePanelClick);
+  document.getElementById("upgrade-search").addEventListener("input", renderAscensionNetwork);
+  document.getElementById("upgrade-branch").addEventListener("change", (event) => {
+    ascensionBranch = event.target.value;
+    selectedUpgradeId = "";
+    renderAscensionNetwork();
+  });
   document.getElementById("game-over-panel").addEventListener("click", handleResultClick);
   document.getElementById("level-complete-panel").addEventListener("click", handleResultClick);
   document.getElementById("pause-panel").addEventListener("click", handlePauseClick);
@@ -811,6 +821,10 @@ function handleMenuClick(event) {
     settingsReturnScreen = "main-menu";
     renderModeOptions();
     showScreen("mode-screen");
+  } else if (action === "ascension") {
+    settingsReturnScreen = "main-menu";
+    renderAscensionNetwork();
+    showScreen("ascension-screen");
   } else if (action === "customize") {
     settingsReturnScreen = "main-menu";
     renderCustomization();
@@ -1052,7 +1066,135 @@ function handlePanelClick(event) {
     document.getElementById("mode-select").value = button.dataset.mode;
     resetGame();
     beginGame(false);
+  } else if (button?.dataset.action === "select-upgrade") {
+    selectedUpgradeId = button.dataset.upgradeId;
+    renderAscensionNetwork();
+  } else if (button?.dataset.action === "purchase-upgrade") {
+    const result = UpgradeManager.purchase(interfaceData.progression, button.dataset.upgradeId);
+    if (!result.ok) return;
+    interfaceData.progression = result.state;
+    saveInterfaceData();
+    renderAscensionNetwork();
   }
+}
+
+function formatProgressionNumber(value) {
+  if (!Number.isFinite(value) || value < 0) return "0";
+  if (value < 1000) return Math.floor(value).toLocaleString();
+  const units = [[1e12, "T"], [1e9, "B"], [1e6, "M"], [1e3, "K"]];
+  const [scale, suffix] = units.find(([threshold]) => value >= threshold) || [1, ""];
+  return `${(value / scale).toPrecision(3).replace(/\.0+$|(?<=\.[0-9]*?)0+$/u, "")}${suffix}`;
+}
+
+function renderAscensionNetwork() {
+  const state = interfaceData.progression;
+  const definitions = UpgradeManager.definitions(state);
+  const branchSelect = document.getElementById("upgrade-branch");
+  if (!branchSelect.options.length) {
+    for (const branch of UpgradeManager.branches) {
+      const option = document.createElement("option");
+      option.value = branch.id;
+      option.textContent = `${branch.symbol}  ${branch.name}`;
+      branchSelect.append(option);
+    }
+  }
+  branchSelect.value = ascensionBranch;
+  document.getElementById("ascension-credits").textContent = formatProgressionNumber(state.credits);
+  document.getElementById("ascension-threat").textContent = formatProgressionNumber(state.threatRating);
+  document.getElementById("ascension-sector").textContent = `${String(state.sector).padStart(2, "0")} / 10`;
+
+  const search = document.getElementById("upgrade-search").value.trim().toLowerCase();
+  const branch = UpgradeManager.branches.find((entry) => entry.id === ascensionBranch) || UpgradeManager.branches[0];
+  const branchNodes = definitions.filter((node) => node.branch === branch.id && (!node.hidden || isAscensionNodeUnlocked(node, state)));
+  const visibleNodes = branchNodes.filter((node) => !search || `${node.name} ${node.description}`.toLowerCase().includes(search));
+  const map = document.getElementById("ascension-network");
+  map.replaceChildren();
+  map.style.setProperty("--branch-color", branch.color);
+  const lines = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  lines.setAttribute("class", "ascension-lines");
+  lines.setAttribute("viewBox", "0 0 1000 650");
+  lines.setAttribute("preserveAspectRatio", "none");
+  lines.setAttribute("aria-hidden", "true");
+  for (const node of visibleNodes) {
+    for (const prerequisite of node.prerequisites) {
+      const source = visibleNodes.find((entry) => entry.id === prerequisite.id);
+      if (!source) continue;
+      const sourceIndex = visibleNodes.indexOf(source);
+      const targetIndex = visibleNodes.indexOf(node);
+      const point = (index) => index < 25
+        ? { x: 100 + (index % 5) * 200, y: 55 + Math.floor(index / 5) * 100 }
+        : { x: 500, y: 605 };
+      const start = point(sourceIndex);
+      const end = point(targetIndex);
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", start.x);
+      line.setAttribute("y1", start.y);
+      line.setAttribute("x2", end.x);
+      line.setAttribute("y2", end.y);
+      line.setAttribute("class", (state.levels[source.id] || 0) >= prerequisite.level ? "network-link link-lit" : "network-link");
+      lines.append(line);
+    }
+  }
+  map.append(lines);
+
+  visibleNodes.forEach((node, index) => {
+    const level = state.levels[node.id] || 0;
+    const unlocked = isAscensionNodeUnlocked(node, state);
+    const cost = UpgradeManager.cost(node, level);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `upgrade-node${unlocked ? " is-available" : " is-locked"}${level ? " is-purchased" : ""}${selectedUpgradeId === node.id ? " is-selected" : ""}`;
+    button.dataset.action = "select-upgrade";
+    button.dataset.upgradeId = node.id;
+    button.style.gridColumn = String(index < 25 ? index % 5 + 1 : 3);
+    button.style.gridRow = String(index < 25 ? Math.floor(index / 5) + 1 : 6);
+    button.style.setProperty("--node-color", node.gate ? "#f5e6ad" : branch.color);
+    button.setAttribute("aria-label", `${node.name}, ${unlocked ? `level ${level} of ${node.maxLevel}` : "locked"}, ${unlocked ? `${formatProgressionNumber(cost)} credits` : "prerequisites incomplete"}`);
+    const title = document.createElement("strong");
+    title.textContent = node.name;
+    const meta = document.createElement("span");
+    meta.textContent = level ? `LV ${level} / ${node.maxLevel}` : unlocked ? `TIER ${node.tier}` : "LOCKED";
+    button.append(title, meta);
+    map.append(button);
+  });
+
+  const selected = definitions.find((node) => node.id === selectedUpgradeId);
+  const detail = document.getElementById("upgrade-detail");
+  detail.replaceChildren();
+  if (!selected) {
+    const label = document.createElement("p");
+    label.className = "eyebrow";
+    label.textContent = "SELECT A NODE";
+    const copy = document.createElement("p");
+    copy.textContent = "Inspect an upgrade to preview its benefit, cost and threat increase.";
+    detail.append(label, copy);
+    return;
+  }
+  const level = state.levels[selected.id] || 0;
+  const unlocked = isAscensionNodeUnlocked(selected, state);
+  const cost = UpgradeManager.cost(selected, level);
+  const threatNext = state.threatRating + selected.threatIncrease;
+  const label = document.createElement("p");
+  label.className = "eyebrow";
+  label.textContent = `${selected.rarity.toUpperCase()} · SECTOR ${String(selected.sector).padStart(2, "0")}`;
+  const title = document.createElement("h3");
+  title.textContent = selected.name;
+  const description = document.createElement("p");
+  description.textContent = selected.description;
+  const benefit = document.createElement("p");
+  benefit.className = "upgrade-benefit";
+  benefit.textContent = `YOUR UPGRADE · +${(selected.playerBenefit * 100).toFixed(1)}% ${selected.upgradeType.replace(/([A-Z])/g, " $1").toUpperCase()}`;
+  const threat = document.createElement("p");
+  threat.className = "upgrade-threat";
+  threat.textContent = `WORLD EVOLUTION · +${selected.threatIncrease} THREAT  |  NEXT THREAT · ${formatProgressionNumber(state.threatRating)} → ${formatProgressionNumber(threatNext)}`;
+  const purchase = document.createElement("button");
+  purchase.type = "button";
+  purchase.className = "primary-button";
+  purchase.dataset.action = "purchase-upgrade";
+  purchase.dataset.upgradeId = selected.id;
+  purchase.textContent = level >= selected.maxLevel ? "MAX LEVEL" : `Acquire · ${formatProgressionNumber(cost)} Credits`;
+  purchase.disabled = !unlocked || level >= selected.maxLevel || state.credits < cost;
+  detail.append(label, title, description, benefit, threat, purchase);
 }
 
 function handlePauseClick(event) {

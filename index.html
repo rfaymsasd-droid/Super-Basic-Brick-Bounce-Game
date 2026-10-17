@@ -23,6 +23,7 @@
           <button class="primary-button" data-action="play">Play</button>
           <button id="continue-button" data-action="continue">Continue</button>
           <button data-action="modes">Modes</button>
+          <button data-action="ascension">Ascension Network</button>
           <button data-action="themes">Themes</button>
           <button data-action="customize">Customize</button>
           <button data-action="achievements">Achievements</button>
@@ -35,6 +36,24 @@
       </section>
 
       <div id="panel-root">
+        <section id="ascension-screen" class="screen content-screen ascension-screen" aria-labelledby="ascension-title" hidden>
+          <button class="back-button" data-action="back">← Main menu</button>
+          <p class="eyebrow">UPGRADE · EVOLVE · ENDURE</p>
+          <div class="ascension-heading">
+            <div><h2 id="ascension-title">THE ASCENSION NETWORK</h2><p>Every gain raises the world's threat.</p></div>
+            <div class="ascension-stats"><span><small>CREDITS</small><strong id="ascension-credits">100</strong></span><span><small>THREAT RATING</small><strong id="ascension-threat">0</strong></span><span><small>SECTOR</small><strong id="ascension-sector">01 / 10</strong></span></div>
+          </div>
+          <div class="ascension-controls">
+            <label class="visually-hidden" for="upgrade-search">Search upgrades</label>
+            <input id="upgrade-search" type="search" placeholder="Search upgrades" autocomplete="off">
+            <label class="visually-hidden" for="upgrade-branch">Choose a branch</label>
+            <select id="upgrade-branch"></select>
+          </div>
+          <div class="ascension-layout">
+            <div id="ascension-network" class="ascension-map" aria-label="Upgrade branch map"></div>
+            <aside id="upgrade-detail" class="upgrade-detail" aria-live="polite"><p class="eyebrow">SELECT A NODE</p><p>Explore a branch to inspect its benefits and threat cost.</p></aside>
+          </div>
+        </section>
         <section id="themes-screen" class="screen theme-overlay" aria-labelledby="themes-title" hidden>
           <div class="theme-dialog" role="dialog" aria-modal="true" aria-labelledby="themes-title" aria-describedby="themes-description">
             <button class="theme-close" type="button" data-action="theme-close" aria-label="Close appearance" data-autofocus>×</button>
@@ -288,7 +307,8 @@
       <button id="return-modern-button" type="button">Return to VECTOR BREAK</button>
     </section>
 
-   <script src="themes.js"></script>
+  <script src="themes.js"></script>
+  <script src="progression.js"></script>
    <script src="galaga-enemies.js"></script>
    <script src="game.js"></script>
    <script src="bricks.js"></script>
