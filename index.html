@@ -22,15 +22,32 @@
         <nav class="main-menu-actions" aria-label="Main menu">
           <button class="primary-button" data-action="play">Play</button>
           <button id="continue-button" data-action="continue">Continue</button>
-          <button data-action="modes">Modes</button>
-          <button data-action="ascension">Ascension Network</button>
-          <button data-action="themes">Themes</button>
-          <button data-action="customize">Customize</button>
-          <button data-action="achievements">Achievements</button>
-          <button data-action="statistics">Statistics</button>
-          <button data-action="credits">Credits</button>
-          <button data-action="settings">Settings</button>
-          <button data-action="fullscreen">Full screen</button>
+          <details class="main-menu-directory">
+            <summary>More options</summary>
+            <div class="menu-directory-panel">
+              <section class="menu-directory-group" aria-labelledby="menu-play-heading">
+                <h2 id="menu-play-heading">Play</h2>
+                <button data-action="modes">Game modes</button>
+              </section>
+              <section class="menu-directory-group" aria-labelledby="menu-progress-heading">
+                <h2 id="menu-progress-heading">Progress</h2>
+                <button data-action="ascension">Ascension network</button>
+                <button data-action="achievements">Achievements</button>
+                <button data-action="statistics">Statistics</button>
+              </section>
+              <section class="menu-directory-group" aria-labelledby="menu-customize-heading">
+                <h2 id="menu-customize-heading">Personalize</h2>
+                <button data-action="themes">Themes</button>
+                <button data-action="customize">Customize</button>
+              </section>
+              <section class="menu-directory-group" aria-labelledby="menu-system-heading">
+                <h2 id="menu-system-heading">System</h2>
+                <button data-action="settings">Settings</button>
+                <button data-action="fullscreen">Full screen</button>
+                <button data-action="credits">Credits</button>
+              </section>
+            </div>
+          </details>
         </nav>
         <p class="menu-hint">ARROWS / A D TO MOVE <span>·</span> SPACE TO LAUNCH <span>·</span> P TO PAUSE</p>
       </section>

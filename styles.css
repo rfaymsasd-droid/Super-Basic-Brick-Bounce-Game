@@ -127,6 +127,78 @@ h1 span,
   gap: 10px;
 }
 
+.main-menu-actions #continue-button,
+.main-menu-directory {
+  grid-column: 1 / -1;
+}
+
+.main-menu-directory > summary {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 14px;
+  border: 1px solid #ffffff29;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  color: var(--text-color);
+  cursor: pointer;
+  font-weight: 700;
+  list-style: none;
+}
+
+.main-menu-directory > summary::-webkit-details-marker {
+  display: none;
+}
+
+.main-menu-directory > summary::after {
+  content: "+";
+  color: var(--accent);
+  font-size: 18px;
+}
+
+.main-menu-directory[open] > summary::after {
+  content: "-";
+}
+
+.main-menu-directory > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.menu-directory-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 8px;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid #ffffff20;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  text-align: left;
+}
+
+.menu-directory-group {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+}
+
+.menu-directory-group h2 {
+  margin: 0 0 2px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.menu-directory-group button {
+  min-height: 36px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  font-size: 12px;
+  text-align: left;
+}
+
 button,
 select {
   min-height: 42px;

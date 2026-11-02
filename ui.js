@@ -800,6 +800,7 @@ function showScreen(screenId) {
 function handleMenuClick(event) {
   const action = event.target.closest("[data-action]")?.dataset.action;
   if (!action) return;
+  event.target.closest(".main-menu-directory")?.removeAttribute("open");
   if (action === "play") {
     document.getElementById("mode-select").value = "campaign";
     resetGame();
