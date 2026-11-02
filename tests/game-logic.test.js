@@ -358,6 +358,40 @@ test('Chaos Overdrive includes a multi-event scheduler with at least 25 event de
   assert.ok(vm.runInContext('scheduler.overloadTimer > 0 || scheduler.warning !== null', context));
 });
 
+test('Chaos scheduler keeps its boosted obstacle target stable and respects the event limit', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'chaos.js'), 'utf8');
+  const context = {
+    console,
+    Math,
+    WIDTH: 900,
+    HEIGHT: 650,
+    activeMode: 'chaos',
+    chaosIntensity: 0,
+    tetrominoTargetActive: 45,
+    interfaceData: { settings: { chaosIntensity: 'catastrophic', chaosMaxEvents: 2 } },
+    balls: [],
+    fallingTetrominoes: [],
+    invaders: [],
+    bricks: [],
+    paddle: { x: 150, y: 580, width: 120, height: 16 },
+    secondPaddle: { x: 600, y: 580, width: 120, height: 16 },
+    document: { getElementById: () => null }
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  vm.runInContext('CHAOS_EVENT_LIBRARY.forEach((event) => { event.start = () => {}; }); scheduler = createChaosScheduler(); for (let tick = 0; tick < 30; tick += 1) scheduler.updateIntensity(); scheduler.beginOverload();', context);
+
+  assert.equal(vm.runInContext('tetrominoTargetActive', context), 68);
+  assert.equal(vm.runInContext('scheduler.activeEvents.length', context), 2);
+  assert.equal(vm.runInContext('scheduler.getMaxActiveEvents()', context), 2);
+});
+
+test('the game loads the complete Chaos event scheduler', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'index.html'), 'utf8');
+
+  assert.match(source, /<script src="\.\/chaos\.js"><\/script>/);
+});
+
 test('Galaga roster includes the original nine enemies and the expanded Galaga 88 entries', () => {
   const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'galaga-enemies.js'), 'utf8');
   const context = { console, Math, WIDTH: 900, HEIGHT: 650, invaders: [] };

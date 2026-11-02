@@ -82,7 +82,10 @@ function createChaosScheduler() {
       scheduler.start();
     },
     getMaxActiveEvents() {
-      return getChaosIntensityPreset().maxActive;
+      const presetLimit = getChaosIntensityPreset().maxActive;
+      const configuredLimit = Number(interfaceData?.settings?.chaosMaxEvents);
+      const maxActive = Number.isFinite(configuredLimit) ? configuredLimit : presetLimit;
+      return Math.min(presetLimit, Math.max(2, Math.min(8, Math.floor(maxActive))));
     },
     chooseWeightedEvent() {
       const weighted = CHAOS_EVENT_LIBRARY.filter((event) => {
@@ -118,6 +121,7 @@ function createChaosScheduler() {
       scheduler.overloadCooldown = 480;
       const selected = overloadLabels.slice(0, 6);
       for (const label of selected) {
+        if (scheduler.activeEvents.length >= scheduler.getMaxActiveEvents()) break;
         const event = CHAOS_EVENT_LIBRARY.find((entry) => entry.label === label || entry.id === label);
         if (!event) continue;
         if (scheduler.activeEvents.some((entry) => entry.id === event.id)) continue;
@@ -172,7 +176,8 @@ function createChaosScheduler() {
       scheduler.intensity = Math.min(100, Math.max(scheduler.intensity, score) + (scheduler.warning ? 3 : 0));
       if (typeof chaosIntensity !== "undefined") chaosIntensity = Math.min(100, Math.max(chaosIntensity, scheduler.intensity));
       if (typeof tetrominoTargetActive !== "undefined") {
-        tetrominoTargetActive = Math.max(30, Math.min(90, Math.round((tetrominoTargetActive || 45) * preset.tetrisBoost)));
+        const boostedTarget = Math.round(45 * preset.tetrisBoost);
+        tetrominoTargetActive = Math.max(tetrominoTargetActive || 30, Math.max(30, Math.min(90, boostedTarget)));
       }
     },
     tick() {
