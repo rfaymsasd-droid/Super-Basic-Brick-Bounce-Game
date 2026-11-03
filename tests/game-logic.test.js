@@ -124,6 +124,22 @@ test('service worker keeps legacy and modern caches isolated', () => {
     'Modern and legacy navigations should use distinct cache keys');
 });
 
+test('brick catalog includes the electric brick type', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'bricks.js'), 'utf8');
+  const context = {
+    console,
+    Math,
+    WIDTH: 900,
+    activeMode: 'classic',
+    getCampaignBrickType: () => 'normal'
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+
+  assert.ok(vm.runInContext('BRICK_TYPES.includes("electric")', context));
+  assert.ok(vm.runInContext('makeBricks(1).some((brick) => brick.type === "electric")', context));
+});
+
 test('corruption surge enters a warning phase and repair bricks push it back', () => {
   const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'corruption.js'), 'utf8');
   const context = {

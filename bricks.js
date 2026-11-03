@@ -4,7 +4,7 @@ const BRICK_WIDTH = 34;
 const BRICK_HEIGHT = 15;
 const BRICK_GAP = 3;
 const BRICKS_TOP = 390;
-const BRICK_TYPES = ["normal", "armored", "explosive", "regenerating", "moving", "golden", "frozen", "portal", "indestructible", "chain"];
+const BRICK_TYPES = ["normal", "armored", "explosive", "regenerating", "moving", "golden", "frozen", "portal", "indestructible", "chain", "electric"];
 const BRICK_LAYOUTS = [
   ["0000111111000000", "0000111111000000", "0000000000000000"],
   ["0000011111100000", "0001111111111000", "0011000000001100"],
@@ -82,7 +82,7 @@ function makeBricks(level = 1, seed = 0) {
 
 function drawBricks() {
   const colorblind = document.body.classList.contains("colorblind-mode");
-  const symbols = { normal: "N", armored: "A", explosive: "E", regenerating: "R", moving: "M", golden: "G", frozen: "F", portal: "P", indestructible: "X", chain: "C" };
+  const symbols = { normal: "N", armored: "A", explosive: "E", regenerating: "R", moving: "M", golden: "G", frozen: "F", portal: "P", indestructible: "X", chain: "C", electric: "Z" };
   for (const brick of bricks) {
     const colors = {
       normal: gameTheme.brick,
@@ -94,11 +94,28 @@ function drawBricks() {
       frozen: gameTheme.accentTertiary,
       portal: gameTheme.accentSecondary,
       indestructible: gameTheme.surface,
-      chain: gameTheme.accentTertiary
+      chain: gameTheme.accentTertiary,
+      electric: gameTheme.accentSecondary
     };
     ctx.fillStyle = colors[brick.type] || "white";
     ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
-    if (brick.type === "armored") {
+    if (brick.type === "electric") {
+      const pulse = (Math.sin(movingTick / 8) + 1) / 2;
+      ctx.save();
+      ctx.shadowColor = gameTheme.accentSecondary;
+      ctx.shadowBlur = 5 + pulse * 8;
+      ctx.fillStyle = gameTheme.accentSecondary;
+      ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
+      ctx.restore();
+      ctx.strokeStyle = gameTheme.text;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(brick.x + brick.width * 0.58, brick.y + 2);
+      ctx.lineTo(brick.x + brick.width * 0.4, brick.y + brick.height * 0.48);
+      ctx.lineTo(brick.x + brick.width * 0.58, brick.y + brick.height * 0.48);
+      ctx.lineTo(brick.x + brick.width * 0.42, brick.y + brick.height - 2);
+      ctx.stroke();
+    } else if (brick.type === "armored") {
       ctx.fillStyle = gameTheme.background;
       ctx.fillRect(brick.x + 3, brick.y + 3, brick.width - 6, 2);
       ctx.fillRect(brick.x + 3, brick.y + 9, brick.width - 6, 2);
