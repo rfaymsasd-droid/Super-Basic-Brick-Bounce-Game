@@ -186,6 +186,7 @@ function update() {
   if (ballAttached) {
     positionBall();
   }
+  updateAdminEnemies();
   if (!started) {
     return;
   }
@@ -235,7 +236,7 @@ function update() {
     }
   }
 
-  if (!gameOver && started && galacticBossDefeatTimer === 0 && areModeObjectivesComplete()) advanceModeLevel();
+  if (activeMode !== "admin" && !gameOver && started && galacticBossDefeatTimer === 0 && areModeObjectivesComplete()) advanceModeLevel();
 
   updateStatus();
 }
@@ -431,27 +432,29 @@ function moveInvaders() {
     updateGalacticCommander(galacticCommander);
     return;
   }
+  const movingInvaders = invaders.filter((invader) => invader.type !== "eater");
+  if (movingInvaders.length === 0) return;
   const speed = 0.9 * (activeEffects.slow ? 0.55 : 1);
-  const leftEdge = Math.min(...invaders.map((invader) => invader.x)) + invaderDirection * speed;
-  const rightEdge = Math.max(...invaders.map((invader) => invader.x + invader.width)) + invaderDirection * speed;
+  const leftEdge = Math.min(...movingInvaders.map((invader) => invader.x)) + invaderDirection * speed;
+  const rightEdge = Math.max(...movingInvaders.map((invader) => invader.x + invader.width)) + invaderDirection * speed;
 
   if (leftEdge < 18 || rightEdge > WIDTH - 18) {
     invaderDirection *= -1;
     if (!invaders.some((invader) => invader.type === "boss")) {
-      for (const invader of invaders) {
+      for (const invader of movingInvaders) {
         invader.y += 14;
       }
     }
   }
 
-  for (const invader of invaders) {
+  for (const invader of movingInvaders) {
     if (invader.galaga) {
       const drift = Math.sin((movingTick + invader.galagaPhase) / 16) * 0.8;
       invader.x += (invaderDirection * speed * 0.8) + drift;
       invader.y += Math.cos((movingTick + invader.galagaPhase) / 18) * 0.35;
       continue;
     }
-    const typeMultiplier = invader.type === "scout" ? 1.8 : invader.type === "boss" && invader.phase > 1 ? 1.5 : invader.small ? 1.5 : 1;
+    const typeMultiplier = (invader.adminSpeed || 1) * (invader.type === "scout" ? 1.8 : invader.type === "boss" && invader.phase > 1 ? 1.5 : invader.small ? 1.5 : 1);
     invader.x += invaderDirection * speed * typeMultiplier;
   }
 
@@ -658,6 +661,7 @@ function draw() {
   }
 
   ctx.save();
+  ctx.filter = getAdminColorFilter();
   if (interfaceData.settings.cameraShake && !interfaceData.settings.reducedMotion && cameraShake > 0) {
     const shake = cameraShake * interfaceData.settings.effectsIntensity;
     ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
@@ -717,6 +721,7 @@ function draw() {
   drawInvaderBullets();
   drawPowerUps();
   drawBossHealth();
+  drawAdminConsumption();
   if (gravityField) {
     ctx.strokeStyle = `${gameTheme.accentSecondary}99`;
     ctx.beginPath();
@@ -788,6 +793,10 @@ function drawPaddle(targetPaddle) {
 
 function drawInvaders() {
   for (const invader of invaders) {
+    if (invader.type === "eater") {
+      drawAdminEater(invader);
+      continue;
+    }
     if (invader.variant === "galactic-commander") {
       drawGalacticCommander(invader);
       drawCorruptionRepairMarker(invader);
@@ -810,7 +819,7 @@ function drawInvaders() {
       boss: gameTheme.accent
     };
     const idleOffset = interfaceData.settings.reducedMotion ? 0 : Math.sin(movingTick / 14 + x * 0.02) * 1.1;
-    ctx.fillStyle = invader.flashTimer > 0 ? "#ffffff" : colors[invader.type] || "white";
+    ctx.fillStyle = invader.flashTimer > 0 ? "#ffffff" : invader.adminColor || colors[invader.type] || "white";
     ctx.globalAlpha = invader.intangible ? 0.25 : 1;
     ctx.fillRect(x + 7, y + idleOffset, width - 14, 5);
     ctx.fillRect(x + 3, y + 5 + idleOffset, width - 6, 8);
@@ -1044,6 +1053,7 @@ function resetGame() {
   dailyComplete = false;
   levelStartScore = 0;
   lives = getModeLives();
+  resetAdminSandbox();
   if (activeMode === "coop") {
     paddle.x = WIDTH / 4 - paddle.width / 2;
     secondPaddle.x = WIDTH * 3 / 4 - secondPaddle.width / 2;

@@ -626,6 +626,26 @@ body.legacy-experience-mode #menu-background {
   font-size: 12px;
 }
 
+.admin-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px 12px;
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid #c7ff4a55;
+  border-radius: 6px;
+  background: #10150f;
+}
+
+.admin-tools[hidden] { display: none; }
+.admin-tools label { display: grid; gap: 4px; color: #cbd4c4; font-size: 11px; }
+.admin-tools input, .admin-tools select, .admin-tools button { min-height: 32px; }
+.admin-tools input[type="range"] { width: 110px; accent-color: #c7ff4a; }
+.admin-tools input[type="color"] { width: 42px; padding: 2px; }
+.admin-tools input[type="number"] { width: 64px; }
+.admin-tools output { color: #c7ff4a; font-variant-numeric: tabular-nums; }
+
 .ability-equipment {
   display: inline-flex;
   align-items: center;

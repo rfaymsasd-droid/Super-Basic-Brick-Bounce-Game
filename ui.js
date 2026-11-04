@@ -354,6 +354,7 @@ function initializeInterface() {
     interfaceData.save.mode = document.getElementById("mode-select").value;
     saveInterfaceData();
   });
+  initializeAdminControls();
   document.addEventListener("keydown", handleThemeKeyboard, { capture: true });
   document.addEventListener("keydown", captureKeybind, { capture: true });
   document.addEventListener("fullscreenchange", updateFullscreenButton);
@@ -903,7 +904,8 @@ function modeDescription(mode) {
     daily: "A shared, date-seeded daily formation.",
     zen: "A relaxed game without attacks or lost lives.",
     coop: "Two paddles, two players, one shared ball.",
-    chaos: "Unpredictable events keep changing the rules as you play."
+    chaos: "Unpredictable events keep changing the rules as you play.",
+    admin: "Build a custom sandbox: spawn and tune enemies, powerups, lives, obstacles, and corruption."
   };
   return descriptions[mode];
 }

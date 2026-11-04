@@ -8,7 +8,8 @@ const MODE_NAMES = {
   daily: "Daily Challenge",
   zen: "Zen",
   coop: "Local Co-op",
-  chaos: "Chaos Mode"
+  chaos: "Chaos Mode",
+  admin: "Admin Sandbox"
 };
 
 const CAMPAIGN_LEVEL_COUNT = 10;
@@ -116,6 +117,11 @@ function initializeModeLevel() {
     case "survival":
       bricks = [];
       invaders = makeInvaders(level);
+      break;
+    case "admin":
+      bricks = makeBricks(level);
+      invaders = [];
+      resetAdminSandbox();
       break;
     case "daily":
       bricks = makeBricks(level, dailySeed);

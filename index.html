@@ -230,6 +230,7 @@
                 <option value="zen">Zen</option>
                 <option value="coop">Local Co-op</option>
                 <option value="chaos">Chaos Mode</option>
+                <option value="admin">Admin Sandbox</option>
               </select>
               <button id="restart-mode" type="button">Restart</button>
               <button id="launch-button" type="button" aria-label="Launch or release the ball">Launch</button>
@@ -245,6 +246,38 @@
               <button id="game-fullscreen-button" type="button">Full screen</button>
             </div>
           </header>
+          <section id="admin-tools" class="admin-tools" aria-label="Admin sandbox controls" hidden>
+            <label>Enemy
+              <select id="admin-enemy-type">
+                <option value="eater">Eater</option><option value="standard">Standard</option>
+                <option value="scout">Scout</option><option value="tank">Tank</option>
+                <option value="sniper">Sniper</option><option value="boss">Boss</option>
+              </select>
+            </label>
+            <label>Scale <input id="admin-enemy-scale" type="range" min="0.7" max="2.4" step="0.1" value="1"><output id="admin-enemy-scale-value">1.0x</output></label>
+            <label>Speed <input id="admin-enemy-speed" type="range" min="0.5" max="2.5" step="0.1" value="1"><output id="admin-enemy-speed-value">1.0x</output></label>
+            <label>Color <input id="admin-enemy-color" type="color" value="#c7ff4a"></label>
+            <label>Eater reach <input id="admin-eater-reach" type="range" min="40" max="180" step="10" value="100"><output id="admin-eater-reach-value">100px</output></label>
+            <button id="admin-spawn-enemy" type="button">Spawn enemy</button>
+            <label>Powerup
+              <select id="admin-powerup-type">
+                <option value="expand">Expand</option><option value="multiball">Multiball</option>
+                <option value="magnet">Magnet</option><option value="piercing">Piercing Ball</option>
+                <option value="shield">Shield</option><option value="slow">Slow Motion</option>
+                <option value="life">Extra Life</option><option value="double">Double Points</option>
+                <option value="laser">Laser Paddle</option><option value="shockwave">Shockwave</option>
+              </select>
+            </label>
+            <button id="admin-spawn-powerup" type="button">Drop powerup</button>
+            <label>Lives <input id="admin-lives" type="number" min="0" max="99" value="3"></label>
+            <label>Obstacles
+              <select id="admin-obstacles"><option value="off">Off</option><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="chaos">Chaos</option></select>
+            </label>
+            <label>Corruption <input id="admin-corruption" type="checkbox"></label>
+            <button id="admin-clear-enemies" type="button">Clear enemies</button>
+            <button id="admin-restore-world" type="button">Restore world</button>
+            <button id="admin-reset-settings" type="button">Reset settings</button>
+          </section>
           <div class="game-status" aria-live="polite">
             <span>Mode <strong id="mode">Campaign</strong></span>
             <span id="chaos-event-status" hidden>Chaos event: anything can happen</span>
@@ -333,6 +366,7 @@
    <script src="tetrominoes.js"></script>
    <script src="mechanics.js"></script>
    <script src="modes.js"></script>
+  <script src="admin.js"></script>
    <script src="corruption.js"></script>
    <script src="./chaos.js"></script>
    <script src="ui.js"></script>

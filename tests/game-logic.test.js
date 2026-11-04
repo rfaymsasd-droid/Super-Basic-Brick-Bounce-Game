@@ -422,3 +422,64 @@ test('Galaga roster includes the original nine enemies and the expanded Galaga 8
   assert.equal(entry.category, 'original');
   assert.ok(entry.health >= 1);
 });
+
+test('admin eater consumes nearby bricks and advances its visual consumption state', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'admin.js'), 'utf8');
+  const brick = { x: 100, y: 100, width: 34, height: 15 };
+  const eater = {
+    x: 100, y: 100, width: 30, height: 20, type: 'eater', adminSpeed: 1,
+    adminColor: '#c7ff4a', eatReach: 100, chewTick: 0, consumed: 0
+  };
+  const context = {
+    console, Math, WIDTH: 900, HEIGHT: 650, activeMode: 'admin',
+    bricks: [brick], invaders: [eater], fallingTetrominoes: [], fallingPowerUps: [],
+    corruptionState: { active: false },
+    boxesTouch: (first, second) => !(first.x + first.width <= second.x || first.x >= second.x + second.width ||
+      first.y + first.height <= second.y || first.y >= second.y + second.height),
+    spawnParticles: () => {}
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  context.updateAdminEnemies();
+
+  assert.equal(context.bricks.length, 0);
+  assert.equal(eater.consumed, 1);
+  assert.ok(vm.runInContext('adminColorDrain', context) > 0);
+  assert.ok(vm.runInContext('adminEatProgress', context) > 0);
+});
+
+test('admin reset settings restores defaults without clearing spawned entities', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'admin.js'), 'utf8');
+  const ids = ['admin-enemy-type', 'admin-enemy-scale', 'admin-enemy-speed', 'admin-enemy-color',
+    'admin-eater-reach', 'admin-powerup-type', 'admin-enemy-scale-value', 'admin-enemy-speed-value',
+    'admin-eater-reach-value', 'admin-lives', 'admin-obstacles', 'admin-corruption'];
+  const elements = Object.fromEntries(ids.map((id) => [id, {}]));
+  const brick = {};
+  const enemy = {};
+  const powerup = {};
+  const context = {
+    console, Math, document: { getElementById: (id) => elements[id] },
+    getModeLives: () => 3, lives: 1, gameOver: true, started: true,
+    bricks: [brick], invaders: [enemy], fallingPowerUps: [powerup],
+    interfaceData: { settings: { obstacleDensity: 'chaos' } },
+    corruptionState: { active: true },
+    resetCorruptionState: () => { context.corruptionState.active = false; },
+    updateStatus: () => {}
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  vm.runInContext('resetAdminSettings()', context);
+
+  assert.equal(elements['admin-enemy-type'].value, 'eater');
+  assert.equal(elements['admin-enemy-scale'].value, '1');
+  assert.equal(elements['admin-powerup-type'].value, 'expand');
+  assert.equal(elements['admin-lives'].value, '3');
+  assert.equal(elements['admin-obstacles'].value, 'low');
+  assert.equal(elements['admin-corruption'].checked, false);
+  assert.equal(context.interfaceData.settings.obstacleDensity, 'low');
+  assert.equal(context.lives, 3);
+  assert.equal(context.gameOver, false);
+  assert.deepEqual(context.bricks, [brick]);
+  assert.deepEqual(context.invaders, [enemy]);
+  assert.deepEqual(context.fallingPowerUps, [powerup]);
+});
