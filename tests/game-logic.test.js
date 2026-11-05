@@ -140,6 +140,71 @@ test('brick catalog includes the electric brick type', () => {
   assert.ok(vm.runInContext('makeBricks(1).some((brick) => brick.type === "electric")', context));
 });
 
+test('Wither Storm appears on Boss Rush round six and has an exposed-core damage window', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'modes.js'), 'utf8');
+  const context = {
+    console,
+    Math,
+    WIDTH: 900,
+    HEIGHT: 650,
+    activeMode: 'boss_rush',
+    activeEffects: {},
+    interfaceData: { settings: { reducedMotion: true } },
+    invaderDirection: 1,
+    invaderBullets: [],
+    paddle: { x: 400, width: 72 },
+    movingTick: 0
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+
+  const boss = vm.runInContext('makeBossInvader(6)', context);
+  assert.equal(boss.variant, 'wither-storm');
+  assert.equal(boss.maxHealth, 72);
+  assert.ok(boss.width > 76);
+
+  context.boss = boss;
+  vm.runInContext('boss.entrance = false; updateWitherStorm(boss);', context);
+  assert.equal(boss.coreOpen, true);
+  assert.equal(boss.intangible, false);
+
+  context.movingTick = 150;
+  vm.runInContext('updateWitherStorm(boss);', context);
+  assert.equal(boss.coreOpen, false);
+  assert.equal(boss.intangible, true);
+});
+
+test('Wither Storm pull attracts nearby balls and its final phase fires seven orbs', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'modes.js'), 'utf8');
+  const context = {
+    console,
+    Math,
+    WIDTH: 900,
+    HEIGHT: 650,
+    activeMode: 'boss_rush',
+    activeEffects: {},
+    interfaceData: { settings: { reducedMotion: true } },
+    invaderDirection: 1,
+    invaderBullets: [],
+    paddle: { x: 400, width: 72 },
+    movingTick: 0
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  context.boss = { x: 360, y: 80, width: 176, height: 116, variant: 'wither-storm', phase: 3, entrance: false };
+  context.invaders = [context.boss];
+  context.nearBall = { x: 280, y: 220, width: 12, height: 12, vx: 0, vy: 0 };
+  context.farBall = { x: 10, y: 500, width: 12, height: 12, vx: 0, vy: 0 };
+
+  vm.runInContext('applyWitherStormPull(nearBall); applyWitherStormPull(farBall); fireWitherStormAttack(boss);', context);
+
+  assert.ok(context.nearBall.vx > 0);
+  assert.ok(context.nearBall.vy < 0);
+  assert.deepEqual(context.farBall, { x: 10, y: 500, width: 12, height: 12, vx: 0, vy: 0 });
+  assert.equal(context.invaderBullets.length, 7);
+  assert.ok(context.invaderBullets.every((bullet) => bullet.witherOrb));
+});
+
 test('corruption surge enters a warning phase and repair bricks push it back', () => {
   const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'corruption.js'), 'utf8');
   const context = {

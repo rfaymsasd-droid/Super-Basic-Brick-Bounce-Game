@@ -147,28 +147,31 @@ function initializeModeLevel() {
 
 function makeBossInvader(bossLevel) {
   const attackPatterns = Object.keys(BOSS_ATTACKS);
-  const health = activeMode === "campaign" ? 18 : 24 + Math.floor(bossLevel / 10) * 4;
+  const witherStorm = activeMode === "boss_rush" && bossLevel % 6 === 0;
+  const health = witherStorm ? 72 : activeMode === "campaign" ? 18 : 24 + Math.floor(bossLevel / 10) * 4;
   const galacticCommander = activeMode === "campaign"
     ? bossLevel === CAMPAIGN_LEVEL_COUNT
     : activeMode === "endless"
       ? bossLevel % 20 === 0
       : activeMode === "boss_rush" && bossLevel % 2 === 1;
   return {
-    x: WIDTH / 2 - (galacticCommander ? 80 : 38),
-    y: galacticCommander ? -108 : 92,
-    width: galacticCommander ? 160 : 76,
-    height: galacticCommander ? 96 : 48,
+    x: WIDTH / 2 - (witherStorm ? 88 : galacticCommander ? 80 : 38),
+    y: witherStorm ? -124 : galacticCommander ? -108 : 92,
+    width: witherStorm ? 176 : galacticCommander ? 160 : 76,
+    height: witherStorm ? 116 : galacticCommander ? 96 : 48,
     type: "boss",
-    variant: galacticCommander ? "galactic-commander" : "crimson",
+    variant: witherStorm ? "wither-storm" : galacticCommander ? "galactic-commander" : "crimson",
     health,
     maxHealth: health,
     fireTimer: 0,
     phase: 1,
-    entrance: galacticCommander,
+    entrance: galacticCommander || witherStorm,
     beamState: "idle",
     beamTimer: 0,
     beamCooldown: 210,
     hoverTick: Math.random() * Math.PI * 2,
+    coreOpen: false,
+    witherVolley: 0,
     attackPattern: activeMode === "campaign"
       ? WORLDS[0].bossPattern
       : attackPatterns[(bossLevel - 1) % attackPatterns.length],
@@ -196,25 +199,94 @@ function fireBossPattern(boss) {
   }
 }
 
+function fireWitherStormAttack(boss) {
+  const count = boss.phase === 3 ? 7 : boss.phase === 2 ? 5 : 3;
+  const speed = boss.phase === 3 ? 4 : boss.phase === 2 ? 3.4 : 2.8;
+  for (let index = 0; index < count; index += 1) {
+    const x = boss.x + boss.width * (index + 1) / (count + 1);
+    const targetX = paddle.x + paddle.width / 2;
+    invaderBullets.push({
+      x: x - 7,
+      y: boss.y + boss.height - 4,
+      width: 14,
+      height: 14,
+      vx: Math.max(-1.5, Math.min(1.5, (targetX - x) * 0.002)),
+      vy: speed,
+      speed,
+      witherOrb: true
+    });
+  }
+  boss.witherVolley += 1;
+}
+
+function updateWitherStorm(boss) {
+  const slowFactor = activeEffects.slow ? 0.55 : 1;
+  const reducedMotion = interfaceData.settings.reducedMotion;
+  boss.hoverTick += reducedMotion ? 0.02 : 0.045;
+  if (boss.entrance) {
+    boss.y = Math.min(68, boss.y + 1.6 * slowFactor);
+    if (boss.y >= 68) boss.entrance = false;
+  } else {
+    const speed = (boss.phase === 3 ? 1.8 : boss.phase === 2 ? 1.35 : 0.95) * slowFactor;
+    boss.x += invaderDirection * speed;
+    if (boss.x < 18 || boss.x + boss.width > WIDTH - 18) {
+      boss.x = Math.max(18, Math.min(WIDTH - boss.width - 18, boss.x));
+      invaderDirection *= -1;
+    }
+    boss.y = 68 + (reducedMotion ? 0 : Math.sin(boss.hoverTick) * 5);
+  }
+
+  const cycle = boss.phase === 3 ? 150 : boss.phase === 2 ? 180 : 210;
+  const openDuration = boss.phase === 3 ? 48 : boss.phase === 2 ? 78 : 120;
+  boss.coreOpen = !boss.entrance && movingTick % cycle < openDuration;
+  boss.intangible = boss.entrance || !boss.coreOpen;
+
+  if (boss.entrance) return;
+  boss.fireTimer += slowFactor;
+  const fireInterval = boss.phase === 3 ? 48 : boss.phase === 2 ? 68 : 92;
+  if (boss.fireTimer >= fireInterval) {
+    boss.fireTimer = 0;
+    fireWitherStormAttack(boss);
+  }
+}
+
+function applyWitherStormPull(targetBall) {
+  const boss = invaders.find((invader) => invader.variant === "wither-storm" && !invader.entrance);
+  if (!boss) return;
+  const dx = boss.x + boss.width / 2 - (targetBall.x + targetBall.width / 2);
+  const dy = boss.y + boss.height / 2 - (targetBall.y + targetBall.height / 2);
+  const distance = Math.hypot(dx, dy);
+  const radius = boss.phase === 3 ? 260 : boss.phase === 2 ? 230 : 205;
+  if (distance === 0 || distance >= radius) return;
+
+  const strength = boss.phase === 3 ? 0.11 : boss.phase === 2 ? 0.075 : 0.045;
+  const influence = 1 - distance / radius;
+  targetBall.vx = Math.max(-7, Math.min(7, targetBall.vx + dx / distance * strength * influence));
+  targetBall.vy = Math.max(-7, Math.min(7, targetBall.vy + dy / distance * strength * influence));
+}
+
 function drawBossHealth() {
   const boss = invaders.find((invader) => invader.type === "boss");
   if (!boss) return;
   const galacticCommander = boss.variant === "galactic-commander";
-  const width = galacticCommander ? 480 : 420;
+  const witherStorm = boss.variant === "wither-storm";
+  const width = galacticCommander ? 480 : witherStorm ? 460 : 420;
   const x = (WIDTH - width) / 2;
   const barY = galacticCommander ? 31 : 24;
   ctx.fillStyle = gameTheme.surface;
   ctx.fillRect(x, barY, width, 14);
-  ctx.fillStyle = galacticCommander ? GALACTIC_COLORS.cyan : gameTheme.accent;
+  ctx.fillStyle = galacticCommander ? GALACTIC_COLORS.cyan : witherStorm ? "#d45bd0" : gameTheme.accent;
   ctx.fillRect(x, barY, width * boss.health / boss.maxHealth, 14);
-  ctx.strokeStyle = galacticCommander ? GALACTIC_COLORS.blue : "#ff7c84";
+  ctx.strokeStyle = galacticCommander ? GALACTIC_COLORS.blue : witherStorm ? "#f3a5ef" : "#ff7c84";
   ctx.strokeRect(x, barY, width, 14);
   ctx.fillStyle = "white";
   ctx.font = galacticCommander ? "bold 16px sans-serif" : "bold 14px sans-serif";
   ctx.textAlign = "center";
   ctx.fillText(galacticCommander
     ? `GALACTIC COMMANDER · PHASE ${boss.phase}`
-    : `${getWorldName()} BOSS · PHASE ${boss.phase}`, WIDTH / 2, galacticCommander ? 23 : 18);
+    : witherStorm
+      ? `WITHER STORM · PHASE ${boss.phase} · CORE ${boss.coreOpen ? "OPEN" : "CLOSED"}`
+      : `${getWorldName()} BOSS · PHASE ${boss.phase}`, WIDTH / 2, galacticCommander ? 23 : 18);
 }
 
 function updateGalacticCommander(boss) {

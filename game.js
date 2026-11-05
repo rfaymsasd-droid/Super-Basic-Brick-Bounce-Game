@@ -211,6 +211,7 @@ function update() {
     const targetBall = balls[index];
     if (targetBall.caught) continue;
     applyGalacticBeamForce(targetBall);
+    applyWitherStormPull(targetBall);
     advanceBallWithCollisionChecks(targetBall);
     if (targetBall.caught) continue;
     if (targetBall.y > HEIGHT) {
@@ -427,6 +428,11 @@ function moveInvaders() {
   }
 
   if (activeMode === "classic" || activeMode === "zen") return;
+  const witherStorm = invaders.find((invader) => invader.variant === "wither-storm");
+  if (witherStorm) {
+    updateWitherStorm(witherStorm);
+    return;
+  }
   const galacticCommander = invaders.find((invader) => invader.variant === "galactic-commander");
   if (galacticCommander) {
     updateGalacticCommander(galacticCommander);
@@ -797,6 +803,10 @@ function drawInvaders() {
       drawAdminEater(invader);
       continue;
     }
+    if (invader.variant === "wither-storm") {
+      drawWitherStorm(invader);
+      continue;
+    }
     if (invader.variant === "galactic-commander") {
       drawGalacticCommander(invader);
       drawCorruptionRepairMarker(invader);
@@ -849,8 +859,74 @@ function drawInvaders() {
   }
 }
 
+function drawWitherStorm(boss) {
+  const { x, y, width, height } = boss;
+  const centerX = x + width / 2;
+  const bodyColor = boss.flashTimer > 0 ? "#ffffff" : "#302638";
+  const shadowColor = "#17131d";
+  ctx.save();
+  if (!interfaceData.settings.reducedMotion) {
+    ctx.shadowColor = boss.coreOpen ? "#e45bd5" : "#78518e";
+    ctx.shadowBlur = 9 * interfaceData.settings.effectsIntensity;
+  }
+  ctx.fillStyle = shadowColor;
+  ctx.fillRect(x + 24, y + 23, width - 48, 62);
+  ctx.fillRect(x + 5, y + 32, 54, 43);
+  ctx.fillRect(x + width - 59, y + 32, 54, 43);
+  ctx.fillStyle = bodyColor;
+  ctx.fillRect(x + 33, y + 14, width - 66, 65);
+  ctx.fillRect(x + 12, y + 27, 55, 42);
+  ctx.fillRect(x + width - 67, y + 27, 55, 42);
+  ctx.fillRect(centerX - 18, y + 4, 36, 16);
+  ctx.fillRect(centerX - 60, y + 18, 30, 18);
+  ctx.fillRect(centerX + 30, y + 18, 30, 18);
+
+  ctx.fillStyle = "#f0d7e8";
+  for (const headX of [x + 39, centerX, x + width - 39]) {
+    ctx.fillRect(headX - 10, y + 40, 7, 7);
+    ctx.fillRect(headX + 3, y + 40, 7, 7);
+  }
+  ctx.fillStyle = "#281d30";
+  for (const headX of [x + 39, centerX, x + width - 39]) {
+    ctx.fillRect(headX - 8, y + 42, 3, 3);
+    ctx.fillRect(headX + 5, y + 42, 3, 3);
+  }
+
+  ctx.fillStyle = boss.coreOpen ? "#ffb5f2" : "#8d508f";
+  ctx.fillRect(centerX - 13, y + 58, 26, 20);
+  ctx.fillStyle = boss.coreOpen ? "#fff0fb" : "#4a3150";
+  ctx.fillRect(centerX - 6, y + 62, 12, 12);
+
+  ctx.fillStyle = shadowColor;
+  for (let tendril = 0; tendril < 5; tendril += 1) {
+    const tendrilX = x + 24 + tendril * 31;
+    const tendrilY = y + 78 + (tendril % 2) * 4;
+    ctx.beginPath();
+    ctx.moveTo(tendrilX, tendrilY);
+    ctx.lineTo(tendrilX + 20, tendrilY + 2);
+    ctx.lineTo(tendrilX + 18 + Math.sin(boss.hoverTick + tendril) * 4, y + height);
+    ctx.lineTo(tendrilX + 8, tendrilY + 13);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+  ctx.fillStyle = boss.coreOpen ? "#ffd4f5" : "#c28ac3";
+  ctx.font = "bold 10px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(boss.coreOpen ? "CORE EXPOSED" : "CORE SHIELDED", centerX, y + height + 12);
+}
+
 function drawInvaderBullets() {
   for (const bullet of invaderBullets) {
+    if (bullet.witherOrb) {
+      ctx.fillStyle = "#dd81db";
+      ctx.beginPath();
+      ctx.arc(bullet.x + bullet.width / 2, bullet.y + bullet.height / 2, bullet.width / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#fff0fb";
+      ctx.fillRect(bullet.x + bullet.width / 2 - 2, bullet.y + bullet.height / 2 - 2, 4, 4);
+      continue;
+    }
     ctx.fillStyle = bullet.electric ? gameTheme.accentSecondary : gameTheme.projectile;
     ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
     if (bullet.electric) {
