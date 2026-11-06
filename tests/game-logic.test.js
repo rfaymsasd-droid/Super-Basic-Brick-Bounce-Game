@@ -556,6 +556,41 @@ test('admin eater consumes nearby bricks and advances its visual consumption sta
   assert.ok(vm.runInContext('adminEatProgress', context) > 0);
 });
 
+test('admin sandbox can spawn a scaled Wither Storm with its boss mechanics', () => {
+  const modesSource = fs.readFileSync(require('node:path').join(__dirname, '..', 'modes.js'), 'utf8');
+  const adminSource = fs.readFileSync(require('node:path').join(__dirname, '..', 'admin.js'), 'utf8');
+  const html = fs.readFileSync(require('node:path').join(__dirname, '..', 'index.html'), 'utf8');
+  const context = {
+    console,
+    Math,
+    WIDTH: 900,
+    HEIGHT: 650,
+    activeMode: 'admin',
+    activeEffects: {},
+    interfaceData: { settings: { reducedMotion: true } },
+    invaderDirection: 1,
+    invaderBullets: [],
+    paddle: { x: 400, width: 72 },
+    invaders: [],
+    movingTick: 0
+  };
+  vm.createContext(context);
+  vm.runInContext(modesSource, context);
+  vm.runInContext(adminSource, context);
+  vm.runInContext('spawnAdminEnemy("wither-storm", 1.5, 2, "#ff00ff", 100);', context);
+
+  const boss = context.invaders[0];
+  assert.match(html, /<option value="wither-storm">Wither Storm<\/option>/);
+  assert.equal(boss.variant, 'wither-storm');
+  assert.equal(boss.width, 264);
+  assert.equal(boss.health, 72);
+  assert.equal(boss.entrance, false);
+  assert.equal(boss.adminSpeed, 2);
+  const previousX = boss.x;
+  vm.runInContext('updateWitherStorm(invaders[0]);', context);
+  assert.notEqual(boss.x, previousX);
+});
+
 test('admin reset settings restores defaults without clearing spawned entities', () => {
   const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'admin.js'), 'utf8');
   const ids = ['admin-enemy-type', 'admin-enemy-scale', 'admin-enemy-speed', 'admin-enemy-color',

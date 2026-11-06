@@ -114,6 +114,18 @@ function resetAdminSettings() {
 }
 
 function spawnAdminEnemy(type, scale, speed, color, reach) {
+  if (type === "wither-storm") {
+    const enemy = makeBossInvader(6, true);
+    enemy.width *= scale;
+    enemy.height *= scale;
+    enemy.x = Math.max(12, Math.min(WIDTH - enemy.width - 12, Math.random() * (WIDTH - enemy.width)));
+    enemy.y = 70 + Math.random() * 100;
+    enemy.entrance = false;
+    enemy.adminSpeed = speed;
+    enemy.adminColor = color;
+    invaders.push(enemy);
+    return;
+  }
   const width = (type === "boss" ? 76 : 30) * scale;
   const height = (type === "boss" ? 48 : 20) * scale;
   const enemy = {

@@ -1037,7 +1037,7 @@ function drawInvaders() {
 function drawWitherStorm(boss) {
   const { x, y, width, height } = boss;
   const centerX = x + width / 2;
-  const bodyColor = boss.flashTimer > 0 ? "#ffffff" : "#302638";
+  const bodyColor = boss.flashTimer > 0 ? "#ffffff" : boss.adminColor || "#302638";
   const shadowColor = "#17131d";
   drawWitherStormTractorBeams(boss);
   ctx.save();

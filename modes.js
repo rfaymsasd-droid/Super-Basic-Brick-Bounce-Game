@@ -146,9 +146,9 @@ function initializeModeLevel() {
   updateStatus();
 }
 
-function makeBossInvader(bossLevel) {
+function makeBossInvader(bossLevel, forceWitherStorm = false) {
   const attackPatterns = Object.keys(BOSS_ATTACKS);
-  const witherStorm = activeMode === "boss_rush" && bossLevel % 6 === 0;
+  const witherStorm = forceWitherStorm || activeMode === "boss_rush" && bossLevel % 6 === 0;
   const health = witherStorm ? 72 : activeMode === "campaign" ? 18 : 24 + Math.floor(bossLevel / 10) * 4;
   const galacticCommander = activeMode === "campaign"
     ? bossLevel === CAMPAIGN_LEVEL_COUNT
@@ -244,7 +244,7 @@ function updateWitherStorm(boss) {
     boss.y = Math.min(68, boss.y + 1.6 * slowFactor);
     if (boss.y >= 68) boss.entrance = false;
   } else {
-    const speed = (0.72 + boss.phase * 0.14) * slowFactor;
+    const speed = (0.72 + boss.phase * 0.14) * (boss.adminSpeed || 1) * slowFactor;
     boss.x += invaderDirection * speed;
     if (boss.x < 18 || boss.x + boss.width > WIDTH - 18) {
       boss.x = Math.max(18, Math.min(WIDTH - boss.width - 18, boss.x));
