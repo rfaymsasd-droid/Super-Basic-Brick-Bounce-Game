@@ -205,6 +205,49 @@ test('Wither Storm pull attracts nearby balls and its final phase fires seven or
   assert.ok(context.invaderBullets.every((bullet) => bullet.witherOrb));
 });
 
+test('Wither Storm evolves through seven stages and its tractor beam inflicts sickness', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'modes.js'), 'utf8');
+  const context = {
+    console,
+    Math,
+    WIDTH: 900,
+    HEIGHT: 650,
+    activeMode: 'boss_rush',
+    activeEffects: {},
+    interfaceData: { settings: { reducedMotion: true } },
+    invaderDirection: 1,
+    invaderBullets: [],
+    paddle: { x: 400, width: 72 },
+    movingTick: 0
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  context.boss = vm.runInContext('makeBossInvader(6)', context);
+  context.invaders = [context.boss];
+  context.boss.entrance = false;
+  context.boss.health = 36;
+  vm.runInContext('updateWitherStorm(boss);', context);
+  assert.equal(context.boss.phase, 4);
+
+  context.boss.health = 1;
+  vm.runInContext('updateWitherStorm(boss);', context);
+  assert.equal(context.boss.phase, 7);
+
+  context.boss.beamState = 'active';
+  context.boss.beamCycle = 0;
+  context.targetBall = {
+    x: context.boss.x + context.boss.width / 2 - 6,
+    y: context.boss.y + context.boss.height + 30,
+    width: 12,
+    height: 12,
+    vx: 0,
+    vy: 0
+  };
+  vm.runInContext('for (let tick = 0; tick < 90; tick += 1) applyWitherStormPull(targetBall);', context);
+  assert.equal(context.targetBall.slowTimer, 90);
+  assert.ok(context.targetBall.vy < 0);
+});
+
 test('corruption surge enters a warning phase and repair bricks push it back', () => {
   const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'corruption.js'), 'utf8');
   const context = {

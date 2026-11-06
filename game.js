@@ -1,5 +1,7 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+const witherStormOverlay = document.getElementById("wither-storm-overlay");
+const witherStormOverlayCtx = witherStormOverlay.getContext("2d");
 
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
@@ -79,6 +81,10 @@ let paddleTargetX = paddle.x;
 let secondPaddleTargetX = secondPaddle.x;
 let objectiveBrickTotal = 0;
 let objectiveInvaderTotal = 0;
+let witherStormOverrunFragments = [];
+let witherStormOverrunIntensity = 0;
+let witherStormLastCaptureTick = -1;
+let witherStormOverrunTarget = null;
 const backgroundStars = Array.from({ length: 56 }, (_, index) => ({
   x: (index * 167 + 47) % WIDTH,
   y: (index * 97 + 31) % HEIGHT,
@@ -754,6 +760,175 @@ function draw() {
   }
   drawChaosAnnouncement();
   drawFungalCorruption();
+  drawWitherStormOverrun();
+}
+
+function drawWitherStormOverrun() {
+  const gameShell = document.getElementById("game-shell");
+  const boss = invaders.find((invader) => invader.variant === "wither-storm");
+  const isEating = !gameShell.hidden && gameActive && started && !gameOver && boss && boss.phase >= 6;
+  const reducedMotion = interfaceData.settings.reducedMotion;
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  const pixelRatio = Math.min(2, window.devicePixelRatio || 1);
+  if (witherStormOverlay.width !== Math.round(width * pixelRatio) ||
+      witherStormOverlay.height !== Math.round(height * pixelRatio)) {
+    witherStormOverlay.width = Math.round(width * pixelRatio);
+    witherStormOverlay.height = Math.round(height * pixelRatio);
+    witherStormOverlayCtx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  }
+
+  witherStormOverrunIntensity = isEating
+    ? reducedMotion ? 0.65 : Math.min(1, witherStormOverrunIntensity + 0.008)
+    : Math.max(0, witherStormOverrunIntensity - 0.035);
+  if (reducedMotion) witherStormOverrunFragments = [];
+  if (boss && isEating) {
+    const bounds = canvas.getBoundingClientRect();
+    witherStormOverrunTarget = {
+      x: bounds.left + (boss.x + boss.width / 2) * bounds.width / WIDTH,
+      y: bounds.top + (boss.y + boss.height / 2) * bounds.height / HEIGHT
+    };
+    if (!reducedMotion && movingTick % 4 === 0 && witherStormLastCaptureTick !== movingTick) {
+      witherStormLastCaptureTick = movingTick;
+      captureWitherStormPixels(bounds, witherStormOverrunTarget);
+    }
+  }
+
+  if (witherStormOverrunIntensity <= 0 && witherStormOverrunFragments.length === 0) {
+    witherStormOverlay.style.display = "none";
+    witherStormOverrunTarget = null;
+    return;
+  }
+  witherStormOverlay.style.display = "block";
+  witherStormOverlayCtx.clearRect(0, 0, width, height);
+  if (boss && isEating) drawWitherStormScreenRift(boss, witherStormOverrunTarget, width, height, reducedMotion);
+  drawWitherStormPixelFragments(reducedMotion);
+}
+
+function captureWitherStormPixels(bounds, target) {
+  const scaleX = bounds.width / WIDTH;
+  const scaleY = bounds.height / HEIGHT;
+  for (let index = 0; index < 3; index += 1) {
+    const sourceX = Math.floor(Math.random() * (WIDTH - 4));
+    const sourceY = Math.floor(Math.random() * (HEIGHT - 4));
+    try {
+      const pixels = ctx.getImageData(sourceX, sourceY, 4, 4);
+      const tile = document.createElement("canvas");
+      tile.width = 4;
+      tile.height = 4;
+      tile.getContext("2d").putImageData(pixels, 0, 0);
+      witherStormOverrunFragments.push({
+        tile,
+        x: bounds.left + sourceX * scaleX,
+        y: bounds.top + sourceY * scaleY,
+        targetX: target.x,
+        targetY: target.y,
+        size: 4 + Math.random() * 5,
+        life: 52,
+        maxLife: 52,
+        drift: Math.random() * Math.PI * 2
+      });
+    } catch (error) {
+      return;
+    }
+  }
+  if (witherStormOverrunFragments.length > 120) {
+    witherStormOverrunFragments.splice(0, witherStormOverrunFragments.length - 120);
+  }
+}
+
+function drawWitherStormPixelFragments(reducedMotion) {
+  for (let index = witherStormOverrunFragments.length - 1; index >= 0; index -= 1) {
+    const fragment = witherStormOverrunFragments[index];
+    if (witherStormOverrunTarget) {
+      fragment.targetX = witherStormOverrunTarget.x;
+      fragment.targetY = witherStormOverrunTarget.y;
+    }
+    const pull = reducedMotion ? 0.12 : 0.035;
+    const drift = reducedMotion ? 0 : Math.sin(fragment.drift + movingTick * 0.08) * 1.5;
+    fragment.x += (fragment.targetX - fragment.x) * pull + drift;
+    fragment.y += (fragment.targetY - fragment.y) * pull;
+    fragment.life -= 1;
+    if (fragment.life <= 0) {
+      witherStormOverrunFragments.splice(index, 1);
+      continue;
+    }
+    witherStormOverlayCtx.globalAlpha = Math.min(1, fragment.life / 16);
+    witherStormOverlayCtx.drawImage(fragment.tile, fragment.x, fragment.y, fragment.size, fragment.size);
+  }
+  witherStormOverlayCtx.globalAlpha = 1;
+}
+
+function drawWitherStormScreenRift(boss, target, width, height, reducedMotion) {
+  const intensity = witherStormOverrunIntensity;
+  const bounds = canvas.getBoundingClientRect();
+  const bodyWidth = bounds.width * (boss.phase >= 7 ? 0.42 + intensity * 0.86 : 0.2 + intensity * 0.38);
+  const bodyHeight = bounds.height * (boss.phase >= 7 ? 0.3 + intensity * 0.58 : 0.17 + intensity * 0.22);
+  const radius = Math.max(width, height) * (boss.phase >= 7 ? 0.3 + intensity * 0.92 : 0.18 + intensity * 0.42);
+  const stormCtx = witherStormOverlayCtx;
+
+  stormCtx.save();
+  const rift = stormCtx.createRadialGradient(target.x, target.y, bodyWidth * 0.12,
+    target.x, target.y, Math.max(1, radius));
+  rift.addColorStop(0, `rgba(9, 4, 15, ${0.36 * intensity})`);
+  rift.addColorStop(0.55, `rgba(24, 8, 31, ${0.2 * intensity})`);
+  rift.addColorStop(1, "rgba(21, 4, 29, 0)");
+  stormCtx.fillStyle = rift;
+  stormCtx.fillRect(0, 0, width, height);
+
+  const tendrilCount = boss.phase >= 7 ? 13 : 7;
+  const sweep = reducedMotion ? 0 : movingTick * 0.009;
+  for (let index = 0; index < tendrilCount; index += 1) {
+    const angle = index * Math.PI * 2 / tendrilCount + sweep;
+    const startX = target.x + Math.cos(angle) * bodyWidth * 0.22;
+    const startY = target.y + Math.sin(angle) * bodyHeight * 0.2;
+    const reach = Math.hypot(width, height) * (0.32 + intensity * 0.55);
+    const endX = Math.max(-40, Math.min(width + 40, target.x + Math.cos(angle) * reach));
+    const endY = Math.max(-40, Math.min(height + 40, target.y + Math.sin(angle) * reach));
+    const bend = Math.sin(angle + sweep * 2) * 55;
+    stormCtx.beginPath();
+    stormCtx.moveTo(startX, startY);
+    stormCtx.quadraticCurveTo(
+      (startX + endX) / 2 - Math.sin(angle) * bend,
+      (startY + endY) / 2 + Math.cos(angle) * bend,
+      endX,
+      endY
+    );
+    stormCtx.lineCap = "round";
+    stormCtx.strokeStyle = `rgba(18, 12, 24, ${0.74 * intensity})`;
+    stormCtx.lineWidth = 9 + intensity * (boss.phase >= 7 ? 28 : 14);
+    stormCtx.stroke();
+    stormCtx.strokeStyle = `rgba(164, 54, 158, ${0.42 * intensity})`;
+    stormCtx.lineWidth = 2 + intensity * 4;
+    stormCtx.stroke();
+  }
+
+  stormCtx.shadowColor = "#8f3a98";
+  stormCtx.shadowBlur = 18 * intensity;
+  stormCtx.fillStyle = `rgba(28, 19, 34, ${0.88 * intensity})`;
+  stormCtx.beginPath();
+  stormCtx.ellipse(target.x, target.y, bodyWidth / 2, bodyHeight / 2, 0, 0, Math.PI * 2);
+  stormCtx.fill();
+  for (const offset of [-0.31, 0, 0.31]) {
+    stormCtx.beginPath();
+    stormCtx.ellipse(target.x + bodyWidth * offset, target.y - bodyHeight * 0.1,
+      bodyWidth * 0.2, bodyHeight * 0.38, 0, 0, Math.PI * 2);
+    stormCtx.fill();
+  }
+
+  const eyeCount = boss.phase >= 7 ? 9 : 3;
+  for (let index = 0; index < eyeCount; index += 1) {
+    const eyeX = target.x + (index - (eyeCount - 1) / 2) * bodyWidth / (eyeCount + 1);
+    const eyeY = target.y - bodyHeight * (index % 2 === 0 ? 0.16 : 0.08);
+    stormCtx.fillStyle = `rgba(222, 116, 244, ${0.9 * intensity})`;
+    stormCtx.fillRect(eyeX - 4, eyeY - 5, 8, 10);
+    stormCtx.fillStyle = `rgba(255, 246, 255, ${0.85 * intensity})`;
+    stormCtx.fillRect(eyeX - 1, eyeY - 2, 3, 4);
+  }
+  stormCtx.fillStyle = `rgba(4, 3, 8, ${0.88 * intensity})`;
+  stormCtx.fillRect(target.x - bodyWidth * 0.12, target.y + bodyHeight * 0.12,
+    bodyWidth * 0.24, bodyHeight * 0.16);
+  stormCtx.restore();
 }
 
 function drawFungalCorruption() {
@@ -864,6 +1039,7 @@ function drawWitherStorm(boss) {
   const centerX = x + width / 2;
   const bodyColor = boss.flashTimer > 0 ? "#ffffff" : "#302638";
   const shadowColor = "#17131d";
+  drawWitherStormTractorBeams(boss);
   ctx.save();
   if (!interfaceData.settings.reducedMotion) {
     ctx.shadowColor = boss.coreOpen ? "#e45bd5" : "#78518e";
@@ -877,29 +1053,47 @@ function drawWitherStorm(boss) {
   ctx.fillRect(x + 33, y + 14, width - 66, 65);
   ctx.fillRect(x + 12, y + 27, 55, 42);
   ctx.fillRect(x + width - 67, y + 27, 55, 42);
+  if (boss.phase >= 6) {
+    for (const bodyX of [x + 5, x + width / 3, x + width * 2 / 3]) {
+      ctx.fillStyle = shadowColor;
+      ctx.fillRect(bodyX, y + 45, 54, 43);
+      ctx.fillStyle = bodyColor;
+      ctx.fillRect(bodyX + 5, y + 48, 44, 35);
+    }
+  }
   ctx.fillRect(centerX - 18, y + 4, 36, 16);
   ctx.fillRect(centerX - 60, y + 18, 30, 18);
   ctx.fillRect(centerX + 30, y + 18, 30, 18);
 
-  ctx.fillStyle = "#f0d7e8";
-  for (const headX of [x + 39, centerX, x + width - 39]) {
-    ctx.fillRect(headX - 10, y + 40, 7, 7);
-    ctx.fillRect(headX + 3, y + 40, 7, 7);
-  }
-  ctx.fillStyle = "#281d30";
-  for (const headX of [x + 39, centerX, x + width - 39]) {
-    ctx.fillRect(headX - 8, y + 42, 3, 3);
-    ctx.fillRect(headX + 5, y + 42, 3, 3);
+  const headPositions = boss.phase < 3 ? [centerX] : [x + 39, centerX, x + width - 39];
+  const headRows = boss.phase >= 6 ? [y + 31, y + 47, y + 63] : [y + 40];
+  for (const headX of headPositions) {
+    for (const headY of headRows) {
+      ctx.fillStyle = boss.phase >= 3 ? "#d887ed" : "#f0d7e8";
+      ctx.fillRect(headX - 10, headY, 7, 7);
+      ctx.fillRect(headX + 3, headY, 7, 7);
+      ctx.fillStyle = boss.phase >= 3 ? "#4c1d69" : "#281d30";
+      ctx.fillRect(headX - 8, headY + 2, 3, 3);
+      ctx.fillRect(headX + 5, headY + 2, 3, 3);
+    }
   }
 
-  ctx.fillStyle = boss.coreOpen ? "#ffb5f2" : "#8d508f";
+  ctx.fillStyle = boss.phase === 7 ? "#120c17" : boss.coreOpen ? "#ffb5f2" : "#8d508f";
   ctx.fillRect(centerX - 13, y + 58, 26, 20);
-  ctx.fillStyle = boss.coreOpen ? "#fff0fb" : "#4a3150";
+  ctx.fillStyle = boss.phase === 7 && boss.coreOpen ? "#fff0fb" : boss.coreOpen ? "#fff0fb" : "#4a3150";
   ctx.fillRect(centerX - 6, y + 62, 12, 12);
+  if (boss.phase === 7) {
+    ctx.fillStyle = "#f6d5e8";
+    ctx.fillRect(centerX - 12, y + 56, 4, 3);
+    ctx.fillRect(centerX + 8, y + 56, 4, 3);
+    ctx.fillRect(centerX - 12, y + 77, 4, 3);
+    ctx.fillRect(centerX + 8, y + 77, 4, 3);
+  }
 
   ctx.fillStyle = shadowColor;
-  for (let tendril = 0; tendril < 5; tendril += 1) {
-    const tendrilX = x + 24 + tendril * 31;
+  const tendrilCount = boss.phase >= 6 ? 9 : boss.phase >= 3 ? 5 : 2;
+  for (let tendril = 0; tendril < tendrilCount; tendril += 1) {
+    const tendrilX = x + 10 + tendril * (width - 20) / Math.max(1, tendrilCount - 1);
     const tendrilY = y + 78 + (tendril % 2) * 4;
     ctx.beginPath();
     ctx.moveTo(tendrilX, tendrilY);
@@ -913,7 +1107,8 @@ function drawWitherStorm(boss) {
   ctx.fillStyle = boss.coreOpen ? "#ffd4f5" : "#c28ac3";
   ctx.font = "bold 10px sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText(boss.coreOpen ? "CORE EXPOSED" : "CORE SHIELDED", centerX, y + height + 12);
+  ctx.fillText(boss.phase === 7 && boss.coreOpen ? "BOWELS EXPOSED" : boss.coreOpen ? "CORE EXPOSED" : "CORE SHIELDED",
+    centerX, y + height + 12);
 }
 
 function drawInvaderBullets() {

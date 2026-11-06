@@ -52,6 +52,7 @@ const GALACTIC_COLORS = {
   turquoise: "#00FFD5",
   black: "#000000"
 };
+const WITHER_STORM_PHASE_NAMES = ["", "AWAKENING", "SHELL", "MAW", "DEVOURER", "JUGGERNAUT", "SPLITTING", "BOWELS"];
 let galacticBossFragments = [];
 let galacticBossDefeatTimer = 0;
 let galacticBossDefeatReward = 0;
@@ -168,7 +169,8 @@ function makeBossInvader(bossLevel) {
     entrance: galacticCommander || witherStorm,
     beamState: "idle",
     beamTimer: 0,
-    beamCooldown: 210,
+    beamCooldown: 180,
+    beamCycle: 0,
     hoverTick: Math.random() * Math.PI * 2,
     coreOpen: false,
     witherVolley: 0,
@@ -200,8 +202,8 @@ function fireBossPattern(boss) {
 }
 
 function fireWitherStormAttack(boss) {
-  const count = boss.phase === 3 ? 7 : boss.phase === 2 ? 5 : 3;
-  const speed = boss.phase === 3 ? 4 : boss.phase === 2 ? 3.4 : 2.8;
+  const count = Math.min(9, 3 + (boss.phase - 1) * 2);
+  const speed = Math.min(4.8, 2.8 + (boss.phase - 1) * 0.4);
   for (let index = 0; index < count; index += 1) {
     const x = boss.x + boss.width * (index + 1) / (count + 1);
     const targetX = paddle.x + paddle.width / 2;
@@ -219,15 +221,30 @@ function fireWitherStormAttack(boss) {
   boss.witherVolley += 1;
 }
 
+function getWitherStormBeamCenters(boss) {
+  const centerX = boss.x + boss.width / 2;
+  if (boss.phase < 4) return [centerX];
+  return [boss.x + boss.width * 0.24, centerX, boss.x + boss.width * 0.76];
+}
+
+function getWitherStormActiveBeamCenters(boss) {
+  const centers = getWitherStormBeamCenters(boss);
+  if (centers.length === 1) return centers;
+  const count = boss.phase >= 6 ? 3 : 2;
+  return Array.from({ length: count }, (_, index) => centers[(boss.beamCycle + index) % centers.length]);
+}
+
 function updateWitherStorm(boss) {
   const slowFactor = activeEffects.slow ? 0.55 : 1;
   const reducedMotion = interfaceData.settings.reducedMotion;
+  const healthRatio = boss.health / boss.maxHealth;
+  boss.phase = Math.min(7, 1 + Math.floor((1 - healthRatio) * 7));
   boss.hoverTick += reducedMotion ? 0.02 : 0.045;
   if (boss.entrance) {
     boss.y = Math.min(68, boss.y + 1.6 * slowFactor);
     if (boss.y >= 68) boss.entrance = false;
   } else {
-    const speed = (boss.phase === 3 ? 1.8 : boss.phase === 2 ? 1.35 : 0.95) * slowFactor;
+    const speed = (0.72 + boss.phase * 0.14) * slowFactor;
     boss.x += invaderDirection * speed;
     if (boss.x < 18 || boss.x + boss.width > WIDTH - 18) {
       boss.x = Math.max(18, Math.min(WIDTH - boss.width - 18, boss.x));
@@ -236,17 +253,44 @@ function updateWitherStorm(boss) {
     boss.y = 68 + (reducedMotion ? 0 : Math.sin(boss.hoverTick) * 5);
   }
 
-  const cycle = boss.phase === 3 ? 150 : boss.phase === 2 ? 180 : 210;
-  const openDuration = boss.phase === 3 ? 48 : boss.phase === 2 ? 78 : 120;
+  const cycle = 210 - boss.phase * 8;
+  const openDuration = Math.max(34, 124 - boss.phase * 13);
   boss.coreOpen = !boss.entrance && movingTick % cycle < openDuration;
   boss.intangible = boss.entrance || !boss.coreOpen;
 
   if (boss.entrance) return;
   boss.fireTimer += slowFactor;
-  const fireInterval = boss.phase === 3 ? 48 : boss.phase === 2 ? 68 : 92;
+  const fireInterval = Math.max(42, 128 - boss.phase * 12);
   if (boss.fireTimer >= fireInterval) {
     boss.fireTimer = 0;
     fireWitherStormAttack(boss);
+  }
+
+  if (boss.beamState === "warning") {
+    boss.beamTimer -= 1;
+    if (boss.beamTimer <= 0) {
+      boss.beamState = "active";
+      boss.beamTimer = Math.max(72, 120 - boss.phase * 4);
+    }
+  } else if (boss.beamState === "active") {
+    boss.beamTimer -= 1;
+    if (boss.beamTimer <= 0) {
+      boss.beamState = "retracting";
+      boss.beamTimer = 28;
+    }
+  } else if (boss.beamState === "retracting") {
+    boss.beamTimer -= 1;
+    if (boss.beamTimer <= 0) {
+      boss.beamState = "idle";
+      boss.beamCooldown = Math.max(100, 220 - boss.phase * 15);
+    }
+  } else {
+    boss.beamCooldown -= 1;
+    if (boss.beamCooldown <= 0) {
+      boss.beamState = "warning";
+      boss.beamTimer = 48;
+      boss.beamCycle = Math.floor(movingTick / 120) % 3;
+    }
   }
 }
 
@@ -256,13 +300,32 @@ function applyWitherStormPull(targetBall) {
   const dx = boss.x + boss.width / 2 - (targetBall.x + targetBall.width / 2);
   const dy = boss.y + boss.height / 2 - (targetBall.y + targetBall.height / 2);
   const distance = Math.hypot(dx, dy);
-  const radius = boss.phase === 3 ? 260 : boss.phase === 2 ? 230 : 205;
-  if (distance === 0 || distance >= radius) return;
+  const radius = 190 + boss.phase * 25;
+  if (distance > 0 && distance < radius) {
+    const strength = 0.035 + boss.phase * 0.025;
+    const influence = 1 - distance / radius;
+    targetBall.vx = Math.max(-7, Math.min(7, targetBall.vx + dx / distance * strength * influence));
+    targetBall.vy = Math.max(-7, Math.min(7, targetBall.vy + dy / distance * strength * influence));
+  }
 
-  const strength = boss.phase === 3 ? 0.11 : boss.phase === 2 ? 0.075 : 0.045;
-  const influence = 1 - distance / radius;
-  targetBall.vx = Math.max(-7, Math.min(7, targetBall.vx + dx / distance * strength * influence));
-  targetBall.vy = Math.max(-7, Math.min(7, targetBall.vy + dy / distance * strength * influence));
+  const beamActive = boss.beamState === "active" || boss.beamState === "retracting";
+  const beamCenters = getWitherStormActiveBeamCenters(boss);
+  const ballCenterX = targetBall.x + targetBall.width / 2;
+  const beamCenter = beamCenters.find((centerX) => Math.abs(centerX - ballCenterX) < 38 + targetBall.width / 2);
+  if (beamCenter !== undefined && targetBall.y + targetBall.height > boss.y + boss.height - 16) {
+    const beamInfluence = 1 - Math.abs(beamCenter - ballCenterX) / (38 + targetBall.width / 2);
+    targetBall.vx = Math.max(-7, Math.min(7, targetBall.vx + (beamCenter - ballCenterX) * 0.006 * beamInfluence));
+    targetBall.vy = Math.max(-7, targetBall.vy - (beamActive ? 0.12 : 0.045) * beamInfluence);
+  }
+
+  const caughtInBeam = beamActive && beamCenter !== undefined &&
+    targetBall.y + targetBall.height > boss.y + boss.height - 16;
+  if (caughtInBeam) targetBall.witherSickness = (targetBall.witherSickness || 0) + 1;
+  else if (targetBall.witherSickness) targetBall.witherSickness = Math.max(0, targetBall.witherSickness - 2);
+  if (targetBall.witherSickness >= 90) {
+    targetBall.witherSickness = 0;
+    targetBall.slowTimer = Math.max(targetBall.slowTimer || 0, 90);
+  }
 }
 
 function drawBossHealth() {
@@ -285,8 +348,62 @@ function drawBossHealth() {
   ctx.fillText(galacticCommander
     ? `GALACTIC COMMANDER · PHASE ${boss.phase}`
     : witherStorm
-      ? `WITHER STORM · PHASE ${boss.phase} · CORE ${boss.coreOpen ? "OPEN" : "CLOSED"}`
+      ? `WITHER STORM · ${WITHER_STORM_PHASE_NAMES[boss.phase]} · CORE ${boss.coreOpen ? "OPEN" : "CLOSED"}`
       : `${getWorldName()} BOSS · PHASE ${boss.phase}`, WIDTH / 2, galacticCommander ? 23 : 18);
+}
+
+function drawWitherStormTractorBeams(boss) {
+  for (const targetBall of balls) {
+    if (!targetBall.witherSickness && !targetBall.slowTimer) continue;
+    ctx.save();
+    ctx.globalAlpha = Math.min(0.65, (targetBall.witherSickness || 0) / 100 + (targetBall.slowTimer || 0) / 300);
+    ctx.strokeStyle = "#d77bea";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(targetBall.x + targetBall.width / 2, targetBall.y + targetBall.height / 2,
+      targetBall.width * 0.9, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+  if (boss.beamState === "idle") return;
+  const extending = boss.beamState === "warning";
+  const progress = boss.beamState === "retracting" ? boss.beamTimer / 28 : 1;
+  const centers = getWitherStormActiveBeamCenters(boss);
+  ctx.save();
+  for (const centerX of centers) {
+    const top = boss.y + boss.height - 8;
+    if (extending) {
+      ctx.globalAlpha = 0.72;
+      ctx.fillStyle = "#e8b3f4";
+      ctx.fillRect(centerX - 2, top, 4, HEIGHT - top);
+      continue;
+    }
+    const width = 52 * progress;
+    ctx.globalAlpha = 0.2 + progress * 0.2;
+    ctx.fillStyle = "#a83fca";
+    ctx.fillRect(centerX - width / 2, top, width, HEIGHT - top);
+    ctx.globalAlpha = 0.75;
+    ctx.fillStyle = "#df8df0";
+    for (let row = 0; top + row * 12 < HEIGHT; row += 1) {
+      const motionTick = interfaceData.settings.reducedMotion ? 0 : movingTick;
+      const y = top + ((row * 12 + motionTick * 3) % Math.max(12, HEIGHT - top));
+      ctx.fillRect(centerX - 2, y, 4, 6);
+      if (!interfaceData.settings.reducedMotion && row % 3 === 0) {
+        ctx.strokeStyle = "#fff4ff";
+        ctx.beginPath();
+        ctx.ellipse(centerX, y + 3, 11 + row % 4 * 3, 3, movingTick * 0.04, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+  }
+  if (extending) {
+    ctx.fillStyle = "#f3d9ff";
+    ctx.globalAlpha = 1;
+    ctx.font = "bold 10px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("TRACTOR BEAM LOCKING", WIDTH / 2, Math.min(HEIGHT - 18, boss.y + boss.height + 18));
+  }
+  ctx.restore();
 }
 
 function updateGalacticCommander(boss) {

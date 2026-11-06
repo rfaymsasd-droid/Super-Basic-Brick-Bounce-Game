@@ -824,6 +824,16 @@ canvas#game {
   user-select: none;
 }
 
+#wither-storm-overlay {
+  position: fixed;
+  z-index: 4;
+  inset: 0;
+  display: none;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+
 #launch-button,
 #pause-button {
   min-height: 44px;
