@@ -205,6 +205,49 @@ test('Wither Storm pull attracts nearby balls and its final phase fires seven or
   assert.ok(context.invaderBullets.every((bullet) => bullet.witherOrb));
 });
 
+test('Wither Storm pixel-eats the playfield while restoring the paddle and balls', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'game.js'), 'utf8');
+  const eatingMaskSource = source.match(/function drawWitherStormEatingMask\(target, width, height\) \{[\s\S]*?\n\}/)[0];
+  const protectedObjectsSource = source.match(/function drawWitherStormProtectedObjects\(bounds\) \{[\s\S]*?\n\}/)[0];
+  const fillRects = [];
+  const restoredObjects = [];
+  const context = {
+    Math,
+    WIDTH: 900,
+    HEIGHT: 650,
+    movingTick: 0,
+    witherStormOverrunRadius: 48,
+    witherStormOverrunIntensity: 1,
+    witherStormOverlayCtx: {
+      save() {},
+      restore() {},
+      set fillStyle(value) { this.currentFillStyle = value; },
+      fillRect(...rect) { fillRects.push(rect); }
+    },
+    canvas: {},
+    paddle: { x: 200, y: 590, width: 72, height: 16 },
+    balls: [{ x: 220, y: 560, width: 12, height: 12 }],
+    getPaddles: () => [context.paddle]
+  };
+  context.witherStormOverlayCtx.fillStyle = "";
+  context.witherStormOverlayCtx.drawImage = (...args) => restoredObjects.push(args);
+  context.witherStormOverlayCtx.clearRect = () => {};
+  vm.createContext(context);
+  vm.runInContext(`${eatingMaskSource}\n${protectedObjectsSource}`, context);
+
+  context.drawWitherStormEatingMask({ x: 50, y: 50 }, 200, 150);
+  context.drawWitherStormProtectedObjects({ left: 10, top: 20, width: 900, height: 650 });
+
+  assert.ok(fillRects.length > 0, 'the expanding radius paints pixel-sized void tiles');
+  assert.ok(fillRects.every(([x, y, width, height]) =>
+    x >= 0 && y >= 0 && x + width <= 200 && y + height <= 150));
+  assert.equal(restoredObjects.length, 2, 'both the paddle and ball are restored above the void');
+  assert.deepEqual(restoredObjects.map((draw) => draw.slice(1, 5)), [
+    [200, 590, 72, 16],
+    [220, 560, 12, 12]
+  ]);
+});
+
 test('Wither Storm evolves through seven stages and its tractor beam inflicts sickness', () => {
   const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'modes.js'), 'utf8');
   const context = {
@@ -442,6 +485,7 @@ test('turning obstacle density Off clears Chaos formations and its spatial index
 });
 
 test('Chaos Overdrive includes a multi-event scheduler with at least 25 event definitions and safe overload warnings', () => {
+  const bricksSource = fs.readFileSync(require('node:path').join(__dirname, '..', 'bricks.js'), 'utf8');
   const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'chaos.js'), 'utf8');
   const context = {
     console,
@@ -470,7 +514,14 @@ test('Chaos Overdrive includes a multi-event scheduler with at least 25 event de
     document: { getElementById: () => ({ hidden: false, textContent: '', style: {} }) }
   };
   vm.createContext(context);
+  vm.runInContext(bricksSource, context);
   vm.runInContext(source, context);
+  vm.runInContext(`
+    for (const id of ['portal_madness', 'moving_walls', 'golden_rush']) {
+      CHAOS_EVENT_LIBRARY.find((event) => event.id === id).start();
+    }
+  `, context);
+  assert.ok(context.bricks.every((brick) => typeof brick.move === 'function' && brick.startX === brick.x));
 
   assert.ok(vm.runInContext('CHAOS_EVENT_LIBRARY.length >= 25', context));
   context.scheduler = vm.runInContext('createChaosScheduler();', context);
@@ -625,4 +676,100 @@ test('admin reset settings restores defaults without clearing spawned entities',
   assert.deepEqual(context.bricks, [brick]);
   assert.deepEqual(context.invaders, [enemy]);
   assert.deepEqual(context.fallingPowerUps, [powerup]);
+});
+
+test('brick movement strategies slide the middle row together and preserve other moving bricks', () => {
+  const root = require('node:path').join(__dirname, '..');
+  const bricksSource = fs.readFileSync(require('node:path').join(root, 'bricks.js'), 'utf8');
+  const mechanicsSource = fs.readFileSync(require('node:path').join(root, 'mechanics.js'), 'utf8');
+  const updateMechanicsSource = mechanicsSource.match(/function updateMechanics\(\) \{[\s\S]*?\n\}/)[0];
+  const context = {
+    console,
+    Math,
+    WIDTH: 900,
+    activeMode: 'classic',
+    activeEffects: {},
+    bricks: [],
+    invaders: [],
+    balls: [],
+    movingTick: 0,
+    specialAbilityRemaining: 0,
+    laserCooldown: 0,
+    keys: {},
+    gameTheme: { accentSecondary: '#fff' },
+    getCampaignBrickType: () => 'normal',
+    getKeybind: () => 'laser',
+    spawnParticles: () => {},
+    updateFallingPowerUps: () => {},
+    updateLaserShots: () => {},
+    updatePowerUpStatus: () => {},
+    updateSpecialAbilityStatus: () => {}
+  };
+  vm.createContext(context);
+  vm.runInContext(bricksSource, context);
+  vm.runInContext(updateMechanicsSource, context);
+  context.bricks = context.makeBricks(1);
+
+  const slideStrategy = context.slide;
+  const stayStillStrategy = context.stayStill;
+  const middleRow = context.bricks.filter((brick) => brick.y === 408);
+  const otherMovingBrick = context.bricks.find((brick) => brick.type === 'moving' && brick.y !== 408);
+  assert.ok(middleRow.length > 0);
+  assert.ok(otherMovingBrick);
+  for (const brick of context.bricks) {
+    assert.equal(brick.startX, brick.x);
+    assert.equal(typeof brick.move, 'function');
+    if (brick.y === 408) {
+      assert.equal(brick.move, slideStrategy);
+      assert.equal(brick.moveSpeed, 2);
+      assert.equal(brick.moveMinX, brick.startX - 30);
+      assert.equal(brick.moveMaxX, brick.startX + 30);
+    } else if (brick.type === 'moving') {
+      assert.equal(brick.move, slideStrategy);
+      assert.equal(brick.moveSpeed, 0.65);
+    } else {
+      assert.equal(brick.move, stayStillStrategy);
+    }
+  }
+
+  context.updateMechanics();
+  assert.equal(middleRow[0].x, middleRow[0].startX + 2);
+  assert.equal(otherMovingBrick.x, otherMovingBrick.startX + 0.65);
+
+  for (let tick = 1; tick < 15; tick += 1) context.updateMechanics();
+  for (const brick of middleRow) assert.equal(brick.x, brick.startX + 30);
+
+  for (let tick = 0; tick < 15; tick += 1) context.updateMechanics();
+  for (const brick of middleRow) assert.equal(brick.x, brick.startX);
+
+  for (let first = 0; first < context.bricks.length; first += 1) {
+    for (let second = first + 1; second < context.bricks.length; second += 1) {
+      const a = context.bricks[first];
+      const b = context.bricks[second];
+      const overlaps = a.x < b.x + b.width && a.x + a.width > b.x &&
+        a.y < b.y + b.height && a.y + a.height > b.y;
+      assert.equal(overlaps, false, 'brick movement should not cause bricks to overlap');
+    }
+  }
+
+  const modesSource = fs.readFileSync(require('node:path').join(root, 'modes.js'), 'utf8');
+  const initializeModeLevelSource = modesSource.match(/function initializeModeLevel\(\) \{[\s\S]*?\n\}/)[0];
+  Object.assign(context, {
+    level: 1,
+    dailySeed: 0,
+    invaderBullets: [],
+    invaderFireTimer: 0,
+    invaderDirection: 1,
+    gravityField: null,
+    objectiveBrickTotal: 0,
+    objectiveInvaderTotal: 0,
+    remainingBrickTargets: () => context.bricks.length,
+    updateStatus: () => {}
+  });
+  vm.runInContext(initializeModeLevelSource, context);
+  context.initializeModeLevel();
+  assert.ok(context.bricks.filter((brick) => brick.movementGroup === 'middle-row')
+    .every((brick) => brick.move === slideStrategy));
+  assert.ok(context.bricks.filter((brick) => brick.movementGroup !== 'middle-row')
+    .every((brick) => brick.move === stayStillStrategy));
 });

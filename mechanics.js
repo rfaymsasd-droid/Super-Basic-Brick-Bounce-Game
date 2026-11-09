@@ -300,13 +300,11 @@ function updateMechanics() {
     if (specialAbilityRemaining === 0) updateSpecialAbilityStatus();
   }
   for (const brick of bricks) {
+    brick.move(brick);
     if (brick.type === "electric" && movingTick % 36 === 0) {
       spawnParticles(brick.x + brick.width / 2, brick.y + brick.height / 2, gameTheme.accentSecondary, 2, 0.6);
     }
-    if (brick.type === "moving") {
-      brick.x += brick.moveDirection * 0.65 * (activeEffects.slow ? 0.55 : 1);
-      if (brick.x < 24 || brick.x + brick.width > WIDTH - 24) brick.moveDirection *= -1;
-    } else if (brick.type === "regenerating" && brick.health < brick.maxHealth) {
+    if (brick.type === "regenerating" && brick.health < brick.maxHealth) {
       brick.regenTimer -= 1;
       if (brick.regenTimer <= 0) {
         brick.health += 1;

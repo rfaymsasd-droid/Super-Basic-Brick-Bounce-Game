@@ -108,7 +108,13 @@ function initializeModeLevel() {
 
   switch (activeMode) {
     case "classic":
-      bricks = makeBricks(level).map((brick) => ({ ...brick, type: "normal", health: 1, maxHealth: 1 }));
+      bricks = makeBricks(level).map((brick) => ({
+        ...brick,
+        type: "normal",
+        health: 1,
+        maxHealth: 1,
+        move: brick.movementGroup === "middle-row" ? slide : stayStill
+      }));
       invaders = [];
       break;
     case "boss_rush":

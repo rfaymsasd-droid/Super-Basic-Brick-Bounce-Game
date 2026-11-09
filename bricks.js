@@ -30,6 +30,49 @@ const INVADER_LAYOUTS = [
   ["0011111100", "0111111110", "1111111111"]
 ];
 
+function stayStill() {}
+
+function slide(brick) {
+  const slowMultiplier = brick.moveSlowable && activeEffects.slow ? 0.55 : 1;
+  const direction = brick.moveDirection;
+  const nextX = brick.x + direction * brick.moveSpeed * slowMultiplier;
+  let targetX = nextX;
+  let nextDirection = direction;
+
+  if (direction > 0 && nextX >= brick.moveMaxX) {
+    targetX = brick.moveMaxX;
+    nextDirection = -1;
+  } else if (direction < 0 && nextX <= brick.moveMinX) {
+    targetX = brick.moveMinX;
+    nextDirection = 1;
+  }
+
+  if (brick.movementGroup) {
+    if (brick.movementGroupUpdatedAt === movingTick) return;
+    const group = bricks.filter((member) => member.movementGroup === brick.movementGroup);
+    const delta = targetX - brick.x;
+    const blocked = group.some((member) => bricks.some((other) => !group.includes(other) &&
+      other.y < member.y + member.height &&
+      other.y + other.height > member.y &&
+      member.x + delta < other.x + other.width &&
+      member.x + delta + member.width > other.x));
+    for (const member of group) {
+      if (!blocked) member.x += delta;
+      member.moveDirection = blocked ? -direction : nextDirection;
+      member.movementGroupUpdatedAt = movingTick;
+    }
+    return;
+  }
+
+  const blocked = bricks.some((other) => other !== brick &&
+    other.y < brick.y + brick.height &&
+    other.y + other.height > brick.y &&
+    targetX < other.x + other.width &&
+    targetX + brick.width > other.x);
+  if (!blocked) brick.x = targetX;
+  brick.moveDirection = blocked ? -direction : nextDirection;
+}
+
 function makeBricks(level = 1, seed = 0) {
   const list = [];
   const layoutOffset = seed ? seed % BRICK_LAYOUTS.length : Math.max(0, level - 1);
@@ -47,15 +90,25 @@ function makeBricks(level = 1, seed = 0) {
             ? BRICK_TYPES[(Math.imul(slot + 1, 31) + (seed >>> 8)) % BRICK_TYPES.length]
             : BRICK_TYPES[(slot) % BRICK_TYPES.length];
         const health = type === "armored" ? 3 : type === "regenerating" ? 2 : 1;
+        const x = left + col * (BRICK_WIDTH + BRICK_GAP);
+        const isMiddleRow = row === 1;
+        const isMovingType = type === "moving" && !isMiddleRow;
         list.push({
-          x: left + col * (BRICK_WIDTH + BRICK_GAP),
+          x,
+          startX: x,
           y: BRICKS_TOP + row * (BRICK_HEIGHT + BRICK_GAP),
           width: BRICK_WIDTH,
           height: BRICK_HEIGHT,
           type,
           health,
           maxHealth: health,
-          moveDirection: col % 2 === 0 ? 1 : -1,
+          move: isMiddleRow || isMovingType ? slide : stayStill,
+          moveDirection: isMiddleRow ? 1 : col % 2 === 0 ? 1 : -1,
+          moveSpeed: isMiddleRow ? 2 : 0.65,
+          moveMinX: isMiddleRow ? Math.max(0, x - 30) : 24,
+          moveMaxX: isMiddleRow ? Math.min(WIDTH - BRICK_WIDTH, x + 30) : WIDTH - 24 - BRICK_WIDTH,
+          moveSlowable: isMovingType,
+          movementGroup: isMiddleRow ? "middle-row" : null,
           regenTimer: 0,
           portalCooldown: 0,
           chainId: `${row}-${Math.floor(col / 2)}`

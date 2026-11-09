@@ -83,6 +83,7 @@ let objectiveBrickTotal = 0;
 let objectiveInvaderTotal = 0;
 let witherStormOverrunFragments = [];
 let witherStormOverrunIntensity = 0;
+let witherStormOverrunRadius = 0;
 let witherStormLastCaptureTick = -1;
 let witherStormOverrunTarget = null;
 const backgroundStars = Array.from({ length: 56 }, (_, index) => ({
@@ -781,6 +782,9 @@ function drawWitherStormOverrun() {
   witherStormOverrunIntensity = isEating
     ? reducedMotion ? 0.65 : Math.min(1, witherStormOverrunIntensity + 0.008)
     : Math.max(0, witherStormOverrunIntensity - 0.035);
+  witherStormOverrunRadius = isEating
+    ? Math.min(Math.hypot(width, height), witherStormOverrunRadius + Math.max(2, Math.hypot(width, height) / 360))
+    : Math.max(0, witherStormOverrunRadius - Math.max(width, height) / 25);
   if (reducedMotion) witherStormOverrunFragments = [];
   if (boss && isEating) {
     const bounds = canvas.getBoundingClientRect();
@@ -794,15 +798,62 @@ function drawWitherStormOverrun() {
     }
   }
 
-  if (witherStormOverrunIntensity <= 0 && witherStormOverrunFragments.length === 0) {
+  if (witherStormOverrunIntensity <= 0 && witherStormOverrunRadius <= 0 && witherStormOverrunFragments.length === 0) {
     witherStormOverlay.style.display = "none";
     witherStormOverrunTarget = null;
     return;
   }
   witherStormOverlay.style.display = "block";
   witherStormOverlayCtx.clearRect(0, 0, width, height);
+  if (witherStormOverrunRadius > 0 && witherStormOverrunTarget) {
+    drawWitherStormEatingMask(witherStormOverrunTarget, width, height);
+  }
   if (boss && isEating) drawWitherStormScreenRift(boss, witherStormOverrunTarget, width, height, reducedMotion);
   drawWitherStormPixelFragments(reducedMotion);
+  if (witherStormOverrunRadius > 0) drawWitherStormProtectedObjects(canvas.getBoundingClientRect());
+}
+
+function drawWitherStormEatingMask(target, width, height) {
+  const radius = witherStormOverrunRadius;
+  const cellSize = 8;
+  const startY = Math.max(0, Math.floor((target.y - radius) / cellSize) * cellSize);
+  const endY = Math.min(height, Math.ceil((target.y + radius) / cellSize) * cellSize);
+
+  witherStormOverlayCtx.save();
+  witherStormOverlayCtx.fillStyle = `rgba(22, 7, 29, ${0.96 * witherStormOverrunIntensity})`;
+  for (let y = startY; y < endY; y += cellSize) {
+    const rowY = y + cellSize / 2 - target.y;
+    const halfWidth = Math.sqrt(Math.max(0, radius * radius - rowY * rowY));
+    const edge = Math.sin(y * 0.17 + movingTick * 0.09) * cellSize;
+    const left = Math.max(0, Math.floor((target.x - halfWidth + edge) / cellSize) * cellSize);
+    const right = Math.min(width, Math.ceil((target.x + halfWidth + edge) / cellSize) * cellSize);
+    if (right > left) witherStormOverlayCtx.fillRect(left, y, right - left, cellSize);
+  }
+  witherStormOverlayCtx.restore();
+}
+
+function drawWitherStormProtectedObjects(bounds) {
+  const scaleX = bounds.width / WIDTH;
+  const scaleY = bounds.height / HEIGHT;
+  const objects = [...getPaddles(), ...balls];
+  for (const object of objects) {
+    const left = bounds.left + object.x * scaleX;
+    const top = bounds.top + object.y * scaleY;
+    const width = object.width * scaleX;
+    const height = object.height * scaleY;
+    const sourceX = Math.max(0, object.x);
+    const sourceY = Math.max(0, object.y);
+    const sourceWidth = Math.min(WIDTH - sourceX, object.width);
+    const sourceHeight = Math.min(HEIGHT - sourceY, object.height);
+    if (sourceWidth <= 0 || sourceHeight <= 0) continue;
+
+    witherStormOverlayCtx.clearRect(left, top, width, height);
+    witherStormOverlayCtx.drawImage(
+      canvas,
+      sourceX, sourceY, sourceWidth, sourceHeight,
+      left, top, sourceWidth * scaleX, sourceHeight * scaleY
+    );
+  }
 }
 
 function captureWitherStormPixels(bounds, target) {
@@ -1306,6 +1357,11 @@ function resetGame() {
   cameraShake = 0;
   paddleImpact = 0;
   impactPaddle = paddle;
+  witherStormOverrunFragments = [];
+  witherStormOverrunIntensity = 0;
+  witherStormOverrunRadius = 0;
+  witherStormOverrunTarget = null;
+  witherStormLastCaptureTick = -1;
   gameParticles = [];
   clearTetrominoes();
   movingTick = 0;
