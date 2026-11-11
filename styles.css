@@ -207,18 +207,39 @@ select {
   background: color-mix(in srgb, var(--surface) 86%, transparent);
   color: var(--text-color);
   font: inherit;
+  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
 }
 
 button {
   padding: 9px 14px;
   cursor: pointer;
-  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms cubic-bezier(.2,.8,.2,1), box-shadow 180ms ease;
 }
 
 button:hover:not(:disabled) {
-  transform: translateY(-2px);
+  transform: translateY(-2px) scale(1.015);
   border-color: var(--accent);
   background: color-mix(in srgb, var(--surface) 76%, var(--accent));
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(0) scale(.985);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+select:hover,
+input[type="range"]:hover {
+  border-color: color-mix(in srgb, var(--accent) 72%, #ffffff29);
+}
+
+input[type="range"] {
+  accent-color: var(--accent);
+}
+
+input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 button:focus-visible,
@@ -299,6 +320,12 @@ button:disabled {
   justify-content: center;
   gap: 8px;
   text-align: left;
+  transition: transform 220ms cubic-bezier(.2,.8,.2,1), border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.mode-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .mode-card strong {
@@ -428,6 +455,13 @@ select {
   display: grid;
   max-width: 480px;
   gap: 18px;
+}
+
+.setting-hint {
+  margin: -12px 0 0;
+  color: #9da7c6;
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .keybind-settings {
@@ -1390,6 +1424,20 @@ body.reduced-motion *::after {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  button,
+  select,
+  .mode-card,
+  .screen {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+
+  button:hover:not(:disabled),
+  .mode-card:hover {
+    transform: none;
+  }
+
   .theme-dialog,
   .theme-card,
   .theme-check,

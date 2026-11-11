@@ -172,6 +172,16 @@
             <label class="range-setting"><span>Music volume <output id="music-volume-value" for="music-volume">20%</output></span><input id="music-volume" type="range" min="0" max="1" step="0.05" value="0.2"></label>
             <label><span>Reduce motion</span><input id="motion-setting" type="checkbox"></label>
             <label><span>Colorblind-friendly targets</span><input id="colorblind-setting" type="checkbox"></label>
+            <label><span>Decorative effects</span><input id="decorative-effects-setting" type="checkbox" checked></label>
+            <label><span>Visual quality</span>
+              <select id="visual-quality-setting" aria-describedby="visual-quality-description">
+                <option value="minimal">Minimal · maximum performance</option>
+                <option value="balanced">Balanced</option>
+                <option value="high">High</option>
+                <option value="ultra">Ultra · maximum effects</option>
+              </select>
+            </label>
+            <p id="visual-quality-description" class="setting-hint">Controls decorative particles, trails, glow, and camera feedback only. Gameplay and difficulty never change.</p>
             <label class="range-setting"><span>Visual effects <output id="effects-intensity-value" for="effects-intensity">60%</output></span><input id="effects-intensity" type="range" min="0" max="1" step="0.1" value="0.6"></label>
             <label class="range-setting"><span>Corruption intensity <output id="corruption-intensity-value" for="corruption-intensity">50%</output></span><input id="corruption-intensity" type="range" min="0" max="1" step="0.1" value="0.5"></label>
             <button id="settings-themes-button" type="button">Appearance &amp; Themes</button>
@@ -362,6 +372,7 @@
   <script src="themes.js"></script>
   <script src="progression.js"></script>
    <script src="galaga-enemies.js"></script>
+   <script src="juice.js"></script>
    <script src="game.js"></script>
    <script src="bricks.js"></script>
    <script src="collisions.js"></script>

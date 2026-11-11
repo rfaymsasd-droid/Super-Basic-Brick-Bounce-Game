@@ -587,6 +587,13 @@ function registerTargetHit(points) {
     highScore = score;
     saveHighScore();
   }
+  if (combo >= 3 && combo % 3 === 0) {
+    GameJuice.emit("combo", WIDTH / 2, 112, {
+      color: gameTheme.accentSecondary,
+      label: `${Math.min(combo, 5)}× COMBO`
+    });
+    playGameSound("combo");
+  }
   updateStatus();
 }
 
@@ -612,6 +619,10 @@ function registerTetrominoRicochet(targetBall, pieceId) {
     chargeSpecialAbility(25);
     registerBonusPoints(300);
     playGameSound("trick");
+    GameJuice.emit("combo", targetBall.x + targetBall.width / 2, targetBall.y, {
+      color: gameTheme.accentSecondary,
+      label: "TRICK SHOT · +300"
+    });
     if (!interfaceData.settings.reducedMotion && interfaceData.settings.effectsIntensity > 0) {
       spawnParticles(targetBall.x + targetBall.width / 2, targetBall.y + targetBall.height / 2,
         gameTheme.accentSecondary, 14, 2.5);
@@ -636,6 +647,10 @@ function registerTetrominoRicochet(targetBall, pieceId) {
   chargeSpecialAbility(15);
   registerBonusPoints(300 * multiplier);
   playGameSound("trick");
+  GameJuice.emit("combo", targetBall.x + targetBall.width / 2, targetBall.y, {
+    color: gameTheme.accentSecondary,
+    label: `RICOCHET ×${multiplier}`
+  });
   if (!interfaceData.settings.reducedMotion && interfaceData.settings.effectsIntensity > 0) {
     spawnParticles(targetBall.x + targetBall.width / 2, targetBall.y + targetBall.height / 2,
       gameTheme.accentSecondary, 14 + multiplier * 3, 2.5 + multiplier * 0.2);
@@ -663,8 +678,11 @@ function saveHighScore() {
 }
 
 function draw() {
-  if (interfaceData.settings.motionBlur && interfaceData.settings.effectsIntensity > 0 && !interfaceData.settings.reducedMotion && started && !paused && !gameOver) {
-    const blurAlpha = 0.42 * interfaceData.settings.effectsIntensity;
+  const visualQuality = GameJuice.getQuality();
+  if (interfaceData.settings.motionBlur && visualQuality.multiplier >= 0.8 &&
+      interfaceData.settings.effectsIntensity > 0 && !interfaceData.settings.reducedMotion &&
+      interfaceData.settings.decorativeEffects !== false && started && !paused && !gameOver) {
+    const blurAlpha = Math.min(0.42, 0.22 * visualQuality.trails) * interfaceData.settings.effectsIntensity;
     ctx.fillStyle = `rgba(0, 0, 0, ${blurAlpha})`;
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
   } else {
@@ -676,9 +694,10 @@ function draw() {
   ctx.save();
   ctx.filter = getAdminColorFilter();
   if (interfaceData.settings.cameraShake && !interfaceData.settings.reducedMotion && cameraShake > 0) {
-    const shake = cameraShake * interfaceData.settings.effectsIntensity;
-    ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+    const shake = Math.min(3.2, cameraShake) * interfaceData.settings.effectsIntensity * visualQuality.shake;
+    ctx.translate((GameJuice.random() - 0.5) * shake, (GameJuice.random() - 0.5) * shake);
   }
+  GameJuice.applyCamera(ctx);
   drawGameBackground();
   drawTetrominoes();
   drawCorruption();
@@ -703,18 +722,24 @@ function draw() {
     ctx.restore();
   }
   for (const targetBall of balls) {
+    const speed = Math.hypot(targetBall.vx, targetBall.vy);
+    const speedRatio = Math.max(0, Math.min(1, (speed - BALL_SPEED) / (BALL_SPEED * 0.8)));
     const trailColor = interfaceData.settings.reducedMotion || interfaceData.customization.trail === "none"
       ? null
       : interfaceData.customization.trail === "spark" ? gameTheme.accentSecondary
       : interfaceData.customization.trail === "ember" ? gameTheme.accent : gameTheme.accentSecondary;
-    if (trailColor && targetBall.trail) {
+    if (trailColor && interfaceData.settings.decorativeEffects !== false && targetBall.trail) {
       targetBall.trail.forEach((point, index) => {
-        ctx.globalAlpha = (index + 1) / targetBall.trail.length * 0.18 * interfaceData.settings.effectsIntensity;
+        const trailQuality = visualQuality.trails;
+        ctx.globalAlpha = (index + 1) / targetBall.trail.length *
+          (0.12 + speedRatio * 0.1) * interfaceData.settings.effectsIntensity * trailQuality;
         ctx.fillStyle = trailColor;
         ctx.shadowColor = trailColor;
-        ctx.shadowBlur = 4;
+        ctx.shadowBlur = interfaceData.settings.reducedMotion ? 0
+          : Math.min(8, 3 + speedRatio * 4) * visualQuality.glow;
         ctx.beginPath();
-        ctx.arc(point.x, point.y, targetBall.width * (index + 1) / targetBall.trail.length / 2, 0, Math.PI * 2);
+        ctx.arc(point.x, point.y, targetBall.width * (index + 1) / targetBall.trail.length *
+          (0.34 + speedRatio * 0.12), 0, Math.PI * 2);
         ctx.fill();
       });
       ctx.globalAlpha = 1;
@@ -722,7 +747,8 @@ function draw() {
     }
     ctx.fillStyle = targetBall.piercing ? "#ff8a3d" : getCustomizationColor("ball");
     ctx.shadowColor = ctx.fillStyle;
-    ctx.shadowBlur = 7 * interfaceData.settings.effectsIntensity;
+    ctx.shadowBlur = interfaceData.settings.decorativeEffects === false ? 0
+      : 7 * interfaceData.settings.effectsIntensity * visualQuality.glow;
     drawSquircle(targetBall.x, targetBall.y, targetBall.width, targetBall.height);
     ctx.shadowBlur = 0;
   }
@@ -731,6 +757,7 @@ function draw() {
   drawEnemyDetails();
   drawGalacticBossEffects();
   drawGameParticles();
+  GameJuice.draw(ctx);
   drawInvaderBullets();
   drawPowerUps();
   drawBossHealth();
@@ -785,7 +812,7 @@ function drawWitherStormOverrun() {
   witherStormOverrunRadius = isEating
     ? Math.min(Math.hypot(width, height), witherStormOverrunRadius + Math.max(2, Math.hypot(width, height) / 360))
     : Math.max(0, witherStormOverrunRadius - Math.max(width, height) / 25);
-  if (reducedMotion) witherStormOverrunFragments = [];
+  if (reducedMotion || interfaceData.settings.decorativeEffects === false) witherStormOverrunFragments = [];
   if (boss && isEating) {
     const bounds = canvas.getBoundingClientRect();
     witherStormOverrunTarget = {
@@ -860,8 +887,8 @@ function captureWitherStormPixels(bounds, target) {
   const scaleX = bounds.width / WIDTH;
   const scaleY = bounds.height / HEIGHT;
   for (let index = 0; index < 3; index += 1) {
-    const sourceX = Math.floor(Math.random() * (WIDTH - 4));
-    const sourceY = Math.floor(Math.random() * (HEIGHT - 4));
+    const sourceX = Math.floor(GameJuice.random() * (WIDTH - 4));
+    const sourceY = Math.floor(GameJuice.random() * (HEIGHT - 4));
     try {
       const pixels = ctx.getImageData(sourceX, sourceY, 4, 4);
       const tile = document.createElement("canvas");
@@ -874,10 +901,10 @@ function captureWitherStormPixels(bounds, target) {
         y: bounds.top + sourceY * scaleY,
         targetX: target.x,
         targetY: target.y,
-        size: 4 + Math.random() * 5,
+        size: 4 + GameJuice.random() * 5,
         life: 52,
         maxLife: 52,
-        drift: Math.random() * Math.PI * 2
+        drift: GameJuice.random() * Math.PI * 2
       });
     } catch (error) {
       return;
@@ -1013,12 +1040,29 @@ function drawPaddle(targetPaddle) {
   ctx.scale(1, scale);
   ctx.translate(-(targetPaddle.x + targetPaddle.width / 2), -(targetPaddle.y + targetPaddle.height / 2));
   ctx.shadowColor = getCustomizationColor("paddle");
-  ctx.shadowBlur = interfaceData.settings.reducedMotion ? 0 : 8 * interfaceData.settings.effectsIntensity;
+  ctx.shadowBlur = interfaceData.settings.reducedMotion || interfaceData.settings.decorativeEffects === false
+    ? 0 : 8 * interfaceData.settings.effectsIntensity * GameJuice.getQuality().glow;
   drawSquircle(targetPaddle.x, targetPaddle.y, targetPaddle.width, targetPaddle.height);
   if (targetPaddle === paddle) {
     ctx.fillStyle = `${gameTheme.text}bb`;
     drawSquircle(targetPaddle.x + targetPaddle.width * 0.42, targetPaddle.y + 2,
       targetPaddle.width * 0.16, Math.max(2, targetPaddle.height - 4));
+  }
+  if (interfaceData.settings.decorativeEffects !== false) {
+    const targetX = targetPaddle === paddle ? paddleTargetX : secondPaddleTargetX;
+    const acceleration = Math.max(-1, Math.min(1, (targetX - targetPaddle.x) / 35));
+    const highlightOffset = acceleration * targetPaddle.width * 0.18;
+    const highlight = ctx.createLinearGradient(
+      targetPaddle.x + targetPaddle.width * 0.5 + highlightOffset - targetPaddle.width * 0.18,
+      0,
+      targetPaddle.x + targetPaddle.width * 0.5 + highlightOffset + targetPaddle.width * 0.18,
+      0
+    );
+    highlight.addColorStop(0, `${gameTheme.accentSecondary}00`);
+    highlight.addColorStop(0.5, `${gameTheme.accentSecondary}bb`);
+    highlight.addColorStop(1, `${gameTheme.accentSecondary}00`);
+    ctx.fillStyle = highlight;
+    ctx.fillRect(targetPaddle.x + 5, targetPaddle.y + 2, targetPaddle.width - 10, 2);
   }
   ctx.restore();
 }
@@ -1094,7 +1138,7 @@ function drawWitherStorm(boss) {
   ctx.save();
   if (!interfaceData.settings.reducedMotion) {
     ctx.shadowColor = boss.coreOpen ? "#e45bd5" : "#78518e";
-    ctx.shadowBlur = 9 * interfaceData.settings.effectsIntensity;
+    ctx.shadowBlur = 9 * interfaceData.settings.effectsIntensity * GameJuice.getQuality().glow;
   }
   ctx.fillStyle = shadowColor;
   ctx.fillRect(x + 24, y + 23, width - 48, 62);
@@ -1237,6 +1281,7 @@ function drawGameBackground() {
   gradient.addColorStop(1, gameTheme.surface);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  if (interfaceData.settings.decorativeEffects === false || GameJuice.getQuality().multiplier < 0.6) return;
   for (const star of backgroundStars) {
     const y = (star.y + (interfaceData.settings.reducedMotion ? 0 : movingTick * star.speed)) % HEIGHT;
     ctx.globalAlpha = 0.18 + (star.radius > 1 ? 0.12 : 0);
@@ -1258,6 +1303,7 @@ function drawGameBackground() {
 }
 
 function drawGameParticles() {
+  if (interfaceData.settings.decorativeEffects === false) return;
   for (const particle of gameParticles) {
     ctx.globalAlpha = particle.life / particle.maxLife * 0.72;
     ctx.fillStyle = particle.color;
@@ -1362,7 +1408,9 @@ function resetGame() {
   witherStormOverrunRadius = 0;
   witherStormOverrunTarget = null;
   witherStormLastCaptureTick = -1;
-  gameParticles = [];
+  gameParticles.length = 0;
+  gameParticlePool.length = 0;
+  GameJuice.clear();
   clearTetrominoes();
   movingTick = 0;
   gravityField = null;

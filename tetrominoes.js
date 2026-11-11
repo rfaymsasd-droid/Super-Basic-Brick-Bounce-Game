@@ -350,7 +350,8 @@ function clearTetrominoVisualEffects() {
 }
 
 function updateTetrominoEffects() {
-  if (!interfaceData.settings.tetrisEffects || interfaceData.settings.reducedMotion) {
+  if (!interfaceData.settings.tetrisEffects || interfaceData.settings.decorativeEffects === false ||
+      interfaceData.settings.reducedMotion) {
     clearTetrominoVisualEffects();
     return;
   }
@@ -458,6 +459,9 @@ function startChaosWave(wave) {
   tetrominoTargetActive = wave.minimum +
     Math.floor(Math.random() * (wave.maximum - wave.minimum + 1));
   chaosAnnouncementTimer = 100;
+  if (typeof GameJuice !== "undefined" && !interfaceData.settings.reducedMotion) {
+    GameJuice.emit("chaos", WIDTH / 2, 88, { color: gameTheme.accent, label: wave.label.toUpperCase() });
+  }
 }
 
 function updateChaosIntensityStatus() {
@@ -577,7 +581,8 @@ function updateTetrominoes() {
   }
 
   const speedFactor = activeEffects.slow ? 0.55 : 1;
-  const effects = interfaceData.settings.tetrisEffects && !interfaceData.settings.reducedMotion;
+  const effects = interfaceData.settings.tetrisEffects &&
+    interfaceData.settings.decorativeEffects !== false && !interfaceData.settings.reducedMotion;
   const trailEnabled = effects && settings.visualIntensity > 0 &&
     (!chaos || fallingTetrominoes.length < 60);
   for (let index = fallingTetrominoes.length - 1; index >= 0; index -= 1) {
@@ -626,22 +631,26 @@ function updateTetrominoes() {
 function createTetrominoExplosion(x, y, colorKey) {
   const settings = getObstacleSettings();
   if (!interfaceData.settings.tetrisEffects || !interfaceData.settings.obstacleExplosionParticles ||
-      interfaceData.settings.reducedMotion || settings.visualIntensity <= 0 ||
+      interfaceData.settings.decorativeEffects === false || interfaceData.settings.reducedMotion || settings.visualIntensity <= 0 ||
       tetrominoParticles.length >= MAX_TETROMINO_PARTICLES) return;
   const color = gameTheme[colorKey] || gameTheme.accent;
-  const intensity = settings.visualIntensity;
-  const count = Math.min(Math.round(18 * intensity), MAX_TETROMINO_PARTICLES - tetrominoParticles.length);
+  const quality = typeof GameJuice === "undefined" ? { particles: MAX_TETROMINO_PARTICLES, multiplier: 1 } : GameJuice.getQuality();
+  const intensity = settings.visualIntensity * quality.multiplier;
+  const capacity = Math.min(MAX_TETROMINO_PARTICLES, quality.particles * 2);
+  const count = Math.min(Math.round(18 * intensity), capacity - tetrominoParticles.length);
+  if (count <= 0) return;
   for (let index = 0; index < count; index += 1) {
     const particle = tetrominoParticlePool.pop() || {};
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 0.8 + Math.random() * 3 * intensity;
-    const life = 20 + Math.floor(Math.random() * 18);
+    const random = typeof GameJuice === "undefined" ? Math.random : GameJuice.random;
+    const angle = random() * Math.PI * 2;
+    const speed = 0.8 + random() * 3 * intensity;
+    const life = 20 + Math.floor(random() * 18);
     Object.assign(particle, {
       x,
       y,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      size: 2 + Math.random() * 4,
+      size: 2 + random() * 4,
       color,
       life,
       maxLife: life
@@ -649,6 +658,9 @@ function createTetrominoExplosion(x, y, colorKey) {
     tetrominoParticles.push(particle);
   }
   tetrominoFlashes.push({ x, y, color, life: 9, maxLife: 9 });
+  if (typeof GameJuice !== "undefined") {
+    GameJuice.emit("obstacle-impact", x, y, { color });
+  }
   if (interfaceData.settings.cameraShake && !interfaceData.settings.reducedMotion) cameraShake = Math.max(cameraShake, 0.7);
 }
 
@@ -664,7 +676,8 @@ function drawChaosAnnouncement() {
   ctx.textAlign = "center";
   ctx.font = "bold 24px monospace";
   ctx.shadowColor = ctx.fillStyle;
-  ctx.shadowBlur = interfaceData.settings.reducedMotion ? 0 : 10 * interfaceData.settings.obstacleVisualIntensity;
+  ctx.shadowBlur = interfaceData.settings.reducedMotion || interfaceData.settings.decorativeEffects === false
+    ? 0 : 10 * interfaceData.settings.obstacleVisualIntensity * GameJuice.getQuality().glow;
   ctx.fillText(label, WIDTH / 2, 82);
   ctx.restore();
 }
@@ -738,7 +751,7 @@ function drawTetrominoes() {
     ctx.shadowColor = color;
     ctx.shadowBlur = interfaceData.settings.tetrisEffects &&
       (interfaceData.settings.obstacleDensity !== "chaos" || fallingTetrominoes.length < 60)
-      ? 6 * settings.visualIntensity : 0;
+      ? 6 * settings.visualIntensity * GameJuice.getQuality().glow : 0;
     ctx.strokeStyle = color;
     ctx.lineWidth = 1.2;
     for (const [column, row] of piece.cells) {
@@ -754,12 +767,13 @@ function drawTetrominoes() {
   }
 
   if (!interfaceData.settings.tetrisEffects || !interfaceData.settings.obstacleExplosionParticles ||
+      interfaceData.settings.decorativeEffects === false ||
       interfaceData.settings.reducedMotion || settings.visualIntensity <= 0) return;
   for (const particle of tetrominoParticles) {
     ctx.globalAlpha = particle.life / particle.maxLife * settings.visualIntensity;
     ctx.fillStyle = particle.color;
     ctx.shadowColor = particle.color;
-    ctx.shadowBlur = 6 * settings.visualIntensity;
+    ctx.shadowBlur = 6 * settings.visualIntensity * GameJuice.getQuality().glow;
     ctx.fillRect(particle.x, particle.y, particle.size, particle.size);
   }
   for (const flash of tetrominoFlashes) {
@@ -775,6 +789,7 @@ function drawTetrominoes() {
 
 function drawChaosStormEffects(visualIntensity) {
   if (interfaceData.settings.obstacleDensity !== "chaos" ||
+      interfaceData.settings.decorativeEffects === false || interfaceData.settings.reducedMotion ||
       (chaosWave?.id !== "corruption" && chaosWave?.id !== "maximum") ||
       visualIntensity <= 0) return;
   const motion = interfaceData.settings.reducedMotion ? 0 : movingTick;

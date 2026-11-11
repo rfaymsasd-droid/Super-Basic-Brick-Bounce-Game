@@ -124,6 +124,75 @@ test('service worker keeps legacy and modern caches isolated', () => {
     'Modern and legacy navigations should use distinct cache keys');
 });
 
+test('visual quality presets normalize old saves and cap only decorative feedback', () => {
+  const uiSource = fs.readFileSync(require('node:path').join(__dirname, '..', 'ui.js'), 'utf8');
+  const normalizeSource = uiSource.match(/function normalizeObstacleSettings\(settings\) \{[\s\S]*?\n\}/)[0];
+  const normalizeContext = { normalizeKeybinds: (keybinds) => keybinds || {} };
+  vm.createContext(normalizeContext);
+  vm.runInContext(normalizeSource, normalizeContext);
+  const oldSettings = vm.runInContext('normalizeObstacleSettings({})', normalizeContext);
+  assert.equal(oldSettings.visualQuality, 'balanced');
+  assert.equal(oldSettings.decorativeEffects, true);
+  assert.equal(vm.runInContext('normalizeObstacleSettings({ visualQuality: "unsupported" }).visualQuality', normalizeContext),
+    'balanced');
+
+  const juiceSource = fs.readFileSync(require('node:path').join(__dirname, '..', 'juice.js'), 'utf8');
+  let gameplayRandomCalls = 0;
+  const isolatedMath = Object.create(Math);
+  isolatedMath.random = () => {
+    gameplayRandomCalls += 1;
+    return 0.5;
+  };
+  const context = {
+    Math: isolatedMath,
+    WIDTH: 900,
+    HEIGHT: 650,
+    gameTheme: { accentSecondary: '#fff' },
+    interfaceData: { settings: { visualQuality: 'minimal', effectsIntensity: 1, decorativeEffects: true, reducedMotion: false } }
+  };
+  vm.createContext(context);
+  vm.runInContext(juiceSource, context);
+  const capacities = ['minimal', 'balanced', 'high', 'ultra'].map((quality) => {
+    context.interfaceData.settings.visualQuality = quality;
+    return vm.runInContext('GameJuice.getQuality().particles', context);
+  });
+  assert.deepEqual(capacities, [64, 160, 280, 420]);
+  const drawCalls = { count: 0 };
+  const renderContext = {
+    save() {},
+    restore() {},
+    beginPath() {},
+    arc() { drawCalls.count += 1; },
+    stroke() { drawCalls.count += 1; },
+    moveTo() {},
+    lineTo() {},
+    translate() {},
+    rotate() {},
+    fillRect() { drawCalls.count += 1; },
+    fillText() { drawCalls.count += 1; }
+  };
+  context.interfaceData.settings.visualQuality = 'minimal';
+  context.renderContext = renderContext;
+  vm.runInContext(`
+    for (let index = 0; index < 100; index += 1) {
+      GameJuice.emit('enemy-defeat', 120, 120, { boss: true, label: 'BOSS' });
+    }
+    GameJuice.draw(renderContext);
+  `, context);
+  assert.equal(gameplayRandomCalls, 0, 'cosmetic effects use a separate random stream from gameplay');
+  assert.ok(drawCalls.count <= 64 * 2 + 8, 'active particle effects and event labels stay within bounded budgets');
+  drawCalls.count = 0;
+  context.interfaceData.settings.decorativeEffects = false;
+  vm.runInContext("GameJuice.clear(); GameJuice.emit('shockwave', 120, 120); GameJuice.draw(renderContext);", context);
+  assert.equal(drawCalls.count, 0, 'disabling decorative effects suppresses cosmetic drawing');
+  context.interfaceData.settings.decorativeEffects = false;
+  assert.equal(vm.runInContext('GameJuice.enabled()', context), false);
+  const html = fs.readFileSync(require('node:path').join(__dirname, '..', 'index.html'), 'utf8');
+  const serviceWorker = fs.readFileSync(require('node:path').join(__dirname, '..', 'service-worker.js'), 'utf8');
+  assert.match(html, /<script src="juice\.js"><\/script>/);
+  assert.match(serviceWorker, /"\.\/juice\.js"/);
+});
+
 test('brick catalog includes the electric brick type', () => {
   const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'bricks.js'), 'utf8');
   const context = {

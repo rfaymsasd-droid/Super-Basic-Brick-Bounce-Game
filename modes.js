@@ -57,6 +57,10 @@ let galacticBossFragments = [];
 let galacticBossDefeatTimer = 0;
 let galacticBossDefeatReward = 0;
 
+function modeVisualRandom() {
+  return typeof GameJuice === "undefined" ? Math.random() : GameJuice.random();
+}
+
 function loadEndlessUnlocked() {
   try {
     return localStorage.getItem("brickBounceEndlessUnlocked") === "true";
@@ -149,6 +153,16 @@ function initializeModeLevel() {
   }
   objectiveBrickTotal = remainingBrickTargets();
   objectiveInvaderTotal = invaders.length;
+  const boss = invaders.find((invader) => invader.type === "boss");
+  if (boss && typeof GameJuice !== "undefined") {
+    GameJuice.emit("boss-intro", boss.x + boss.width / 2, boss.y + boss.height / 2, {
+      color: boss.variant === "wither-storm" ? "#d77bea"
+        : boss.variant === "galactic-commander" ? GALACTIC_COLORS.cyan : gameTheme.accent,
+      label: boss.variant === "wither-storm" ? "WITHER STORM · INCOMING"
+        : boss.variant === "galactic-commander" ? "GALACTIC COMMANDER"
+          : "BOSS ENCOUNTER"
+    });
+  }
   updateStatus();
 }
 
@@ -245,6 +259,14 @@ function updateWitherStorm(boss) {
   const reducedMotion = interfaceData.settings.reducedMotion;
   const healthRatio = boss.health / boss.maxHealth;
   boss.phase = Math.min(7, 1 + Math.floor((1 - healthRatio) * 7));
+  if (!reducedMotion && boss._juicePhase !== undefined && boss._juicePhase !== boss.phase) {
+    GameJuice.emit("boss-phase", boss.x + boss.width / 2, boss.y + boss.height / 2, {
+      color: "#d77bea",
+      label: WITHER_STORM_PHASE_NAMES[boss.phase],
+      bossY: boss.y + boss.height + 24
+    });
+  }
+  boss._juicePhase = boss.phase;
   boss.hoverTick += reducedMotion ? 0.02 : 0.045;
   if (boss.entrance) {
     boss.y = Math.min(68, boss.y + 1.6 * slowFactor);
@@ -296,6 +318,13 @@ function updateWitherStorm(boss) {
       boss.beamState = "warning";
       boss.beamTimer = 48;
       boss.beamCycle = Math.floor(movingTick / 120) % 3;
+      if (!reducedMotion) {
+        GameJuice.emit("boss-warning", boss.x + boss.width / 2, boss.y + boss.height + 20, {
+          color: "#e8b3f4",
+          label: "TRACTOR BEAM LOCKING"
+        });
+        playGameSound("warning");
+      }
     }
   }
 }
@@ -342,8 +371,20 @@ function drawBossHealth() {
   const width = galacticCommander ? 480 : witherStorm ? 460 : 420;
   const x = (WIDTH - width) / 2;
   const barY = galacticCommander ? 31 : 24;
+  boss.displayHealth ??= boss.health;
+  if (interfaceData.settings.reducedMotion || interfaceData.settings.decorativeEffects === false) {
+    boss.displayHealth = boss.health;
+  } else {
+    boss.displayHealth += (boss.health - boss.displayHealth) * 0.18;
+  }
+  const healthRatio = Math.max(0, Math.min(1, boss.health / boss.maxHealth));
+  const trailingRatio = Math.max(healthRatio, Math.min(1, boss.displayHealth / boss.maxHealth));
   ctx.fillStyle = gameTheme.surface;
   ctx.fillRect(x, barY, width, 14);
+  if (trailingRatio > healthRatio && interfaceData.settings.decorativeEffects !== false) {
+    ctx.fillStyle = gameTheme.accentSecondary;
+    ctx.fillRect(x + width * healthRatio, barY, width * (trailingRatio - healthRatio), 14);
+  }
   ctx.fillStyle = galacticCommander ? GALACTIC_COLORS.cyan : witherStorm ? "#d45bd0" : gameTheme.accent;
   ctx.fillRect(x, barY, width * boss.health / boss.maxHealth, 14);
   ctx.strokeStyle = galacticCommander ? GALACTIC_COLORS.blue : witherStorm ? "#f3a5ef" : "#ff7c84";
@@ -457,6 +498,13 @@ function updateGalacticCommander(boss) {
     if (boss.beamCooldown <= 0) {
       boss.beamState = "warning";
       boss.beamTimer = 60;
+      if (!interfaceData.settings.reducedMotion) {
+        GameJuice.emit("boss-warning", boss.x + boss.width / 2, boss.y + boss.height + 20, {
+          color: GALACTIC_COLORS.cyan,
+          label: "TRACTOR BEAM LOCKING"
+        });
+        playGameSound("warning");
+      }
     }
   }
 
@@ -506,7 +554,7 @@ function drawGalacticTractorBeam(boss) {
   ctx.save();
   if (!interfaceData.settings.reducedMotion && interfaceData.settings.effectsIntensity > 0) {
     ctx.shadowColor = GALACTIC_COLORS.cyan;
-    ctx.shadowBlur = 7 * interfaceData.settings.effectsIntensity;
+    ctx.shadowBlur = 7 * interfaceData.settings.effectsIntensity * GameJuice.getQuality().glow;
   }
   for (let row = 0; row * 10 < drawnHeight; row += 1) {
     const y = beamOriginY + row * 10;
@@ -545,7 +593,7 @@ function drawGalacticCommander(boss) {
   ctx.imageSmoothingEnabled = false;
   if (!interfaceData.settings.reducedMotion && boss.phase === 3) {
     ctx.shadowColor = GALACTIC_COLORS.magenta;
-    ctx.shadowBlur = 8 * interfaceData.settings.effectsIntensity;
+    ctx.shadowBlur = 8 * interfaceData.settings.effectsIntensity * GameJuice.getQuality().glow;
   }
   const outline = GALACTIC_COLORS.outline;
   rect(-2, 0, 4, 2, outline);
@@ -608,17 +656,17 @@ function spawnGalacticBossFragments(boss) {
     GALACTIC_COLORS.purple, GALACTIC_COLORS.cyan, GALACTIC_COLORS.turquoise];
   const fragmentCount = interfaceData.settings.reducedMotion ? 30 : 54;
   for (let index = 0; index < fragmentCount; index += 1) {
-    const angle = Math.random() * Math.PI * 2;
+    const angle = modeVisualRandom() * Math.PI * 2;
     const speed = (interfaceData.settings.reducedMotion ? 0.5 : 1) +
-      Math.random() * (interfaceData.settings.reducedMotion ? 1.5 : 4);
+      modeVisualRandom() * (interfaceData.settings.reducedMotion ? 1.5 : 4);
     galacticBossFragments.push({
-      x: boss.x + 10 + Math.random() * 140,
-      y: boss.y + 4 + Math.random() * 84,
+      x: boss.x + 10 + modeVisualRandom() * 140,
+      y: boss.y + 4 + modeVisualRandom() * 84,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      size: 3 + Math.floor(Math.random() * 5),
+      size: 3 + Math.floor(modeVisualRandom() * 5),
       color: colors[index % colors.length],
-      life: 75 + Math.floor(Math.random() * 35)
+      life: 75 + Math.floor(modeVisualRandom() * 35)
     });
   }
   galacticBossDefeatTimer = 150;

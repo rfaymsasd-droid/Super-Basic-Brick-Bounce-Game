@@ -61,6 +61,12 @@ function slide(brick) {
       member.moveDirection = blocked ? -direction : nextDirection;
       member.movementGroupUpdatedAt = movingTick;
     }
+    if (typeof GameJuice !== "undefined" && (blocked || nextDirection !== direction) &&
+        movingTick - (brick._lastJuiceReverseTick ?? -Infinity) > 24) {
+      brick._lastJuiceReverseTick = movingTick;
+      GameJuice.emit("row-reverse", brick.x + brick.width / 2, brick.y + brick.height / 2,
+        { color: gameTheme.accentSecondary, directionX: -direction });
+    }
     return;
   }
 
@@ -71,6 +77,12 @@ function slide(brick) {
     targetX + brick.width > other.x);
   if (!blocked) brick.x = targetX;
   brick.moveDirection = blocked ? -direction : nextDirection;
+  if (typeof GameJuice !== "undefined" && (blocked || nextDirection !== direction) &&
+      movingTick - (brick._lastJuiceReverseTick ?? -Infinity) > 24) {
+    brick._lastJuiceReverseTick = movingTick;
+    GameJuice.emit("row-reverse", brick.x + brick.width / 2, brick.y + brick.height / 2,
+      { color: gameTheme.accentSecondary, directionX: -direction });
+  }
 }
 
 function makeBricks(level = 1, seed = 0) {
@@ -136,6 +148,30 @@ function makeBricks(level = 1, seed = 0) {
 function drawBricks() {
   const colorblind = document.body.classList.contains("colorblind-mode");
   const symbols = { normal: "N", armored: "A", explosive: "E", regenerating: "R", moving: "M", golden: "G", frozen: "F", portal: "P", indestructible: "X", chain: "C", electric: "Z" };
+  if (interfaceData.settings.decorativeEffects !== false && !interfaceData.settings.reducedMotion) {
+    ctx.save();
+    ctx.globalAlpha = 0.3 + (Math.sin(movingTick / 9) + 1) * 0.16;
+    ctx.strokeStyle = gameTheme.accentTertiary;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    for (let index = 0; index < bricks.length; index += 1) {
+      const brick = bricks[index];
+      if (brick.type !== "chain") continue;
+      for (let otherIndex = index + 1; otherIndex < bricks.length; otherIndex += 1) {
+        const other = bricks[otherIndex];
+        if (other.type !== "chain" || other.chainId !== brick.chainId) continue;
+        const dx = other.x + other.width / 2 - (brick.x + brick.width / 2);
+        const dy = other.y + other.height / 2 - (brick.y + brick.height / 2);
+        if (Math.hypot(dx, dy) <= BRICK_WIDTH * 1.6) {
+          ctx.moveTo(brick.x + brick.width / 2, brick.y + brick.height / 2);
+          ctx.lineTo(other.x + other.width / 2, other.y + other.height / 2);
+        }
+      }
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
   for (const brick of bricks) {
     const colors = {
       normal: gameTheme.brick,
@@ -150,13 +186,37 @@ function drawBricks() {
       chain: gameTheme.accentTertiary,
       electric: gameTheme.accentSecondary
     };
+    if ((brick.movementGroup === "middle-row" || brick.type === "moving") &&
+        interfaceData.settings.decorativeEffects !== false &&
+        !interfaceData.settings.reducedMotion) {
+      ctx.save();
+      const direction = brick.moveDirection || 1;
+      const trailWidth = 8 + Math.abs(brick.moveSpeed || 0) * 5;
+      const trailStart = direction > 0 ? brick.x - trailWidth : brick.x + brick.width + trailWidth;
+      const trailEnd = direction > 0 ? brick.x : brick.x + brick.width;
+      const trail = ctx.createLinearGradient(
+        trailStart, 0, trailEnd, 0
+      );
+      trail.addColorStop(0, `${gameTheme.accentSecondary}00`);
+      trail.addColorStop(1, `${gameTheme.accentSecondary}65`);
+      ctx.fillStyle = trail;
+      ctx.fillRect(direction > 0 ? brick.x - trailWidth : brick.x + brick.width, brick.y + 2,
+        trailWidth, brick.height - 4);
+      ctx.restore();
+    }
     ctx.fillStyle = colors[brick.type] || "white";
     ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
+    if (interfaceData.settings.decorativeEffects !== false) {
+      ctx.fillStyle = `${gameTheme.text}35`;
+      ctx.fillRect(brick.x + 2, brick.y + 1, brick.width - 4, 1);
+    }
     if (brick.type === "electric") {
-      const pulse = (Math.sin(movingTick / 8) + 1) / 2;
+      const pulse = interfaceData.settings.reducedMotion || interfaceData.settings.decorativeEffects === false
+        ? 0.5 : (Math.sin(movingTick / 8) + 1) / 2;
       ctx.save();
       ctx.shadowColor = gameTheme.accentSecondary;
-      ctx.shadowBlur = 5 + pulse * 8;
+      ctx.shadowBlur = interfaceData.settings.decorativeEffects === false
+        ? 0 : (5 + pulse * 8) * (typeof GameJuice === "undefined" ? 1 : GameJuice.getQuality().glow);
       ctx.fillStyle = gameTheme.accentSecondary;
       ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
       ctx.restore();
@@ -180,13 +240,28 @@ function drawBricks() {
       ctx.fillStyle = gameTheme.background;
       ctx.fillRect(brick.x + 5, brick.y + 5, brick.width - 10, 5);
     } else if (brick.type === "golden") {
+      if (interfaceData.settings.decorativeEffects !== false && !interfaceData.settings.reducedMotion) {
+        ctx.save();
+        ctx.globalAlpha = 0.22 + (Math.sin(movingTick / 12 + brick.x) + 1) * 0.14;
+        ctx.fillStyle = gameTheme.text;
+        ctx.fillRect(brick.x + 2, brick.y + 2, brick.width - 4, 2);
+        ctx.restore();
+      }
       ctx.strokeStyle = gameTheme.text;
       ctx.strokeRect(brick.x + 4, brick.y + 3, brick.width - 8, brick.height - 6);
     } else if (brick.type === "portal") {
+      ctx.save();
+      ctx.translate(brick.x + brick.width / 2, brick.y + brick.height / 2);
+      ctx.rotate(interfaceData.settings.reducedMotion || interfaceData.settings.decorativeEffects === false
+        ? 0 : movingTick * 0.035);
       ctx.strokeStyle = gameTheme.text;
       ctx.beginPath();
-      ctx.ellipse(brick.x + brick.width / 2, brick.y + brick.height / 2, 6, 5, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, 6, 5, 0, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 9, 3, Math.PI / 3, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
     } else if (brick.type === "indestructible") {
       ctx.fillStyle = gameTheme.background;
       ctx.fillRect(brick.x + 5, brick.y + 5, brick.width - 10, 5);

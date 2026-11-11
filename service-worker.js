@@ -1,10 +1,11 @@
-const CACHE_NAME = "vector-break-shell-v10";
+const CACHE_NAME = "vector-break-shell-v11";
 const LEGACY_CACHE_NAME = "vector-break-legacy-v1";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./galaga-enemies.js",
+  "./juice.js",
   "./game.js",
   "./themes.js",
   "./bricks.js",

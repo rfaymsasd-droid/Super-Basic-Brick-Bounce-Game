@@ -1,3 +1,7 @@
+function emitCollisionJuice(type, x, y, options) {
+  if (typeof GameJuice !== "undefined") GameJuice.emit(type, x, y, options);
+}
+
 function boxesTouch(a, b) {
   return (
     a.x < b.x + b.width &&
@@ -13,18 +17,24 @@ function bounceOffWalls(targetBall = ball) {
     targetBall.vx = -targetBall.vx;
     playGameSound("wall");
     spawnParticles(targetBall.x, targetBall.y + targetBall.height / 2, gameTheme.accentSecondary, 2, 0.8);
+    emitCollisionJuice("ball-hit", targetBall.x, targetBall.y + targetBall.height / 2,
+      { color: gameTheme.accentSecondary, directionX: 1 });
   }
   if (targetBall.x + targetBall.width > WIDTH) {
     targetBall.x = WIDTH - targetBall.width;
     targetBall.vx = -targetBall.vx;
     playGameSound("wall");
     spawnParticles(targetBall.x + targetBall.width, targetBall.y + targetBall.height / 2, gameTheme.accentSecondary, 2, 0.8);
+    emitCollisionJuice("ball-hit", targetBall.x + targetBall.width, targetBall.y + targetBall.height / 2,
+      { color: gameTheme.accentSecondary, directionX: -1 });
   }
   if (targetBall.y < 0) {
     targetBall.y = 0;
     targetBall.vy = -targetBall.vy;
     playGameSound("wall");
     spawnParticles(targetBall.x + targetBall.width / 2, targetBall.y, gameTheme.accentSecondary, 2, 0.8);
+    emitCollisionJuice("ball-hit", targetBall.x + targetBall.width / 2, targetBall.y,
+      { color: gameTheme.accentSecondary, directionY: 1 });
   }
 }
 
@@ -54,6 +64,8 @@ function bounceOffPaddle(targetBall = ball, targetPaddle = paddle) {
     } else {
       playGameSound("paddle");
     }
+    emitCollisionJuice("paddle-hit", targetBall.x + targetBall.width / 2, targetPaddle.y,
+      { color: gameTheme.paddle, perfect: perfectHit, directionX: targetBall.vx });
     spawnParticles(targetBall.x + targetBall.width / 2, targetPaddle.y, gameTheme.paddle, 7, 1.7);
   }
 }
@@ -85,6 +97,8 @@ function bounceOffBricks(targetBall = ball) {
     }
 
     spawnParticles(targetBall.x + targetBall.width / 2, targetBall.y + targetBall.height / 2, gameTheme.brick, 2, 0.8);
+    emitCollisionJuice("ball-hit", targetBall.x + targetBall.width / 2, targetBall.y + targetBall.height / 2,
+      { color: gameTheme.brick, directionX: targetBall.vx, directionY: targetBall.vy });
     damageBrick(index, targetBall);
     break;
   }

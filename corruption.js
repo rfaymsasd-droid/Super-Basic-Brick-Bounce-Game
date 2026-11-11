@@ -65,6 +65,9 @@ function triggerCorruptionSurge() {
     survived: false
   };
   markCorruptionRepairTargets();
+  if (typeof GameJuice !== "undefined" && !interfaceData.settings.reducedMotion) {
+    GameJuice.emit("corruption", WIDTH / 2, 100, { color: "#00D5FF", label: "CORRUPTION DETECTED" });
+  }
 }
 
 function getCorruptionBoundaryY() {
@@ -78,6 +81,9 @@ function finishCorruptionSurge() {
   corruptionState.timer = 180;
   corruptionState.lastRepairBonus = 250;
   registerBonusPoints(250);
+  if (typeof GameJuice !== "undefined" && !interfaceData.settings.reducedMotion) {
+    GameJuice.emit("corruption", WIDTH / 2, 100, { color: "#00FFD5", label: "SYSTEM REPAIRED" });
+  }
 }
 
 function finishCorruptionRecovery() {

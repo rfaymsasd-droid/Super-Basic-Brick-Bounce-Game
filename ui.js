@@ -109,6 +109,7 @@ function loadInterfaceData() {
     settings: {
       sound: true, sfxVolume: 0.7, music: true, musicVolume: 0.2, reducedMotion: false,
       effectsIntensity: 0.6, corruptionIntensity: 0.5, colorblind: false, cameraShake: false, motionBlur: false,
+      visualQuality: "balanced", decorativeEffects: true,
       animatedGrid: true, tetrisEffects: true, obstacleDensity: "low",
       obstacleMinSize: 20, obstacleMaxSize: 50, obstacleSpeed: 1,
       obstacleVisualIntensity: 0.6, obstacleExplosionParticles: true,
@@ -159,6 +160,13 @@ function normalizeObstacleSettings(settings) {
     : "catastrophic";
   return {
     ...settings,
+    sfxVolume: clamp(settings.sfxVolume, 0, 1, 0.7),
+    musicVolume: clamp(settings.musicVolume, 0, 1, 0.2),
+    effectsIntensity: clamp(settings.effectsIntensity, 0, 1, 0.6),
+    visualQuality: ["minimal", "balanced", "high", "ultra"].includes(settings.visualQuality)
+      ? settings.visualQuality
+      : "balanced",
+    decorativeEffects: settings.decorativeEffects !== false,
     obstacleDensity: densities.includes(settings.obstacleDensity) ? settings.obstacleDensity : "low",
     obstacleMinSize: minimum,
     obstacleMaxSize: maximum,
@@ -247,15 +255,25 @@ function initializeInterface() {
     ["camera-shake-setting", "cameraShake"],
     ["motion-blur-setting", "motionBlur"],
     ["grid-setting", "animatedGrid"],
+    ["decorative-effects-setting", "decorativeEffects"],
     ["colorblind-setting", "colorblind"]
   ]) {
     document.getElementById(setting).addEventListener("change", (event) => {
       interfaceData.settings[key] = event.target.checked;
       if (key === "colorblind") document.body.classList.toggle("colorblind-mode", event.target.checked);
+      if (key === "decorativeEffects" && !event.target.checked) {
+        gameParticles.length = 0;
+        GameJuice.clear();
+        clearTetrominoVisualEffects();
+      }
       saveInterfaceData();
       updateMusic();
     });
   }
+  document.getElementById("visual-quality-setting").addEventListener("change", (event) => {
+    interfaceData.settings.visualQuality = event.target.value;
+    saveInterfaceData();
+  });
   document.getElementById("obstacle-density-setting").addEventListener("change", (event) => {
     interfaceData.settings.obstacleDensity = event.target.value;
     clearTetrominoes();
@@ -799,6 +817,7 @@ function showScreen(screenId) {
 }
 
 function handleMenuClick(event) {
+  if (event.target.closest("button, summary")) playGameSound("menu");
   const action = event.target.closest("[data-action]")?.dataset.action;
   if (!action) return;
   event.target.closest(".main-menu-directory")?.removeAttribute("open");
@@ -959,6 +978,8 @@ function applyCustomization() {
   document.getElementById("music-setting").checked = interfaceData.settings.music;
   document.getElementById("camera-shake-setting").checked = interfaceData.settings.cameraShake;
   document.getElementById("motion-blur-setting").checked = interfaceData.settings.motionBlur;
+  document.getElementById("visual-quality-setting").value = interfaceData.settings.visualQuality;
+  document.getElementById("decorative-effects-setting").checked = interfaceData.settings.decorativeEffects;
   document.getElementById("grid-setting").checked = interfaceData.settings.animatedGrid;
   document.getElementById("tetris-effects-setting").checked = interfaceData.settings.tetrisEffects;
   document.getElementById("obstacle-density-setting").value = interfaceData.settings.obstacleDensity;
@@ -1031,6 +1052,8 @@ function renderSettings() {
   document.getElementById("music-setting").checked = interfaceData.settings.music;
   document.getElementById("camera-shake-setting").checked = interfaceData.settings.cameraShake;
   document.getElementById("motion-blur-setting").checked = interfaceData.settings.motionBlur;
+  document.getElementById("visual-quality-setting").value = interfaceData.settings.visualQuality;
+  document.getElementById("decorative-effects-setting").checked = interfaceData.settings.decorativeEffects;
   document.getElementById("grid-setting").checked = interfaceData.settings.animatedGrid;
   document.getElementById("tetris-effects-setting").checked = interfaceData.settings.tetrisEffects;
   document.getElementById("obstacle-density-setting").value = interfaceData.settings.obstacleDensity;
@@ -1062,6 +1085,7 @@ function renderSettings() {
 }
 
 function handlePanelClick(event) {
+  if (event.target.closest("button")) playGameSound("menu");
   const button = event.target.closest("[data-action]");
   if (button?.dataset.action === "back") {
     showScreen(settingsReturnScreen);
@@ -1252,6 +1276,7 @@ function resumeGame() {
 }
 
 function showLevelComplete(previousScore, nextLevel) {
+  playGameSound("victory");
   gameOver = false;
   paused = true;
   updateSpecialAbilityStatus();
@@ -1269,6 +1294,7 @@ function showLevelComplete(previousScore, nextLevel) {
 }
 
 function showGameOver() {
+  playGameSound("defeat");
   gameOver = true;
   paused = true;
   gameActive = false;
@@ -1365,11 +1391,11 @@ function startMenuBackground() {
   const canvas = document.getElementById("menu-background");
   const context = canvas.getContext("2d");
   menuStars = Array.from({ length: 72 }, () => ({
-    x: Math.random() * canvas.width,
-    y: Math.random() * canvas.height,
-    radius: 1 + Math.random() * 2,
-    speed: 0.15 + Math.random() * 0.8,
-    phase: Math.random() * Math.PI * 2
+    x: GameJuice.random() * canvas.width,
+    y: GameJuice.random() * canvas.height,
+    radius: 1 + GameJuice.random() * 2,
+    speed: 0.15 + GameJuice.random() * 0.8,
+    phase: GameJuice.random() * Math.PI * 2
   }));
   const drawBackground = () => {
     menuTick += 1;

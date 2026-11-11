@@ -10,6 +10,14 @@ const POWER_UPS = [
   { id: "laser", name: "Laser Paddle", color: "#dc83ff", shape: "laser", duration: 480, weight: 6 },
   { id: "shockwave", name: "Shockwave", color: "#ffad42", shape: "burst", duration: 0, weight: 5 }
 ];
+
+function emitMechanicsJuice(type, x, y, options) {
+  if (typeof GameJuice !== "undefined") GameJuice.emit(type, x, y, options);
+}
+
+function visualRandom() {
+  return typeof GameJuice === "undefined" ? Math.random() : GameJuice.random();
+}
 let chaosEventTimer = 0;
 let chaosEventLabelTimer = 0;
 let chaosGravityTimer = 0;
@@ -21,6 +29,7 @@ let soundContext;
 let movingTick = 0;
 let laserCooldown = 0;
 let gameParticles = [];
+let gameParticlePool = [];
 let musicNodes = [];
 let musicMode = "";
 let musicInterval = 0;
@@ -41,19 +50,47 @@ function playGameSound(kind) {
   if (!AudioContextType) return;
   soundContext ||= new AudioContextType();
   if (soundContext.state === "suspended") soundContext.resume();
-  const notes = { wall: [260, 0.045], paddle: [440, 0.08], brick: [330, 0.06], enemy: [185, 0.09], powerup: [620, 0.1], destroy: [520, 0.11], perfect: [880, 0.12], ability: [720, 0.13], trick: [990, 0.14] };
-  const [frequency, volume] = notes[kind] || notes.brick;
+  const notes = {
+    wall: [260, 0.045, "sine", 0.07],
+    paddle: [440, 0.08, "triangle", 0.1],
+    brick: [330, 0.055, "sine", 0.075],
+    armored: [190, 0.07, "square", 0.085],
+    frozen: [740, 0.075, "sine", 0.12],
+    regenerate: [510, 0.08, "triangle", 0.14],
+    electric: [590, 0.08, "sawtooth", 0.11],
+    portal: [280, 0.1, "triangle", 0.16],
+    explosive: [115, 0.11, "triangle", 0.2],
+    reward: [830, 0.1, "sine", 0.17],
+    enemy: [185, 0.09, "triangle", 0.12],
+    boss: [92, 0.16, "sawtooth", 0.28],
+    warning: [360, 0.065, "triangle", 0.16],
+    powerup: [620, 0.1, "sine", 0.15],
+    destroy: [520, 0.11, "triangle", 0.15],
+    perfect: [880, 0.12, "sine", 0.18],
+    ability: [720, 0.13, "triangle", 0.2],
+    trick: [990, 0.14, "sine", 0.2],
+    combo: [760, 0.14, "triangle", 0.22],
+    menu: [480, 0.045, "sine", 0.075],
+    victory: [660, 0.22, "triangle", 0.42],
+    defeat: [180, 0.24, "sawtooth", 0.48]
+  };
+  const [frequency, volume, waveform, duration] = notes[kind] || notes.brick;
   const oscillator = soundContext.createOscillator();
   const gain = soundContext.createGain();
-  oscillator.type = kind === "enemy" ? "triangle" : "sine";
+  oscillator.type = waveform;
   oscillator.frequency.setValueAtTime(frequency, soundContext.currentTime);
-  oscillator.frequency.exponentialRampToValueAtTime(Math.max(100, frequency * 0.72), soundContext.currentTime + 0.09);
+  oscillator.frequency.exponentialRampToValueAtTime(Math.max(70, frequency * (kind === "reward" || kind === "victory" ? 1.28 : 0.72)),
+    soundContext.currentTime + duration * 0.72);
   gain.gain.setValueAtTime(volume * interfaceData.settings.sfxVolume, soundContext.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, soundContext.currentTime + 0.12);
+  gain.gain.exponentialRampToValueAtTime(0.001, soundContext.currentTime + duration);
   oscillator.connect(gain);
   gain.connect(soundContext.destination);
+  oscillator.onended = () => {
+    oscillator.disconnect();
+    gain.disconnect();
+  };
   oscillator.start();
-  oscillator.stop(soundContext.currentTime + 0.12);
+  oscillator.stop(soundContext.currentTime + duration);
 }
 
 function updateMusic() {
@@ -122,22 +159,27 @@ function stopMusic() {
 }
 
 function spawnParticles(x, y, color, count = 5, force = 2) {
-  if (interfaceData.settings.reducedMotion || interfaceData.settings.effectsIntensity <= 0) return;
+  if (interfaceData.settings.reducedMotion || interfaceData.settings.decorativeEffects === false ||
+      interfaceData.settings.effectsIntensity <= 0) return;
   const intensity = interfaceData.settings.effectsIntensity;
-  count = Math.max(1, Math.round(count * intensity));
+  const capacity = typeof GameJuice === "undefined" ? 500 : GameJuice.getQuality().particles;
+  count = Math.min(Math.max(1, Math.round(count * intensity)), capacity - gameParticles.length);
+  if (count <= 0) return;
   force *= intensity;
   for (let index = 0; index < count; index += 1) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 0.5 + Math.random() * force;
-    gameParticles.push({
+    const angle = visualRandom() * Math.PI * 2;
+    const speed = 0.5 + visualRandom() * force;
+    const particle = gameParticlePool.pop() || {};
+    Object.assign(particle, {
       x, y,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      size: 1 + Math.random() * 2,
+      size: 1 + visualRandom() * 2,
       color,
-      life: 18 + Math.floor(Math.random() * 13),
+      life: 18 + Math.floor(visualRandom() * 13),
       maxLife: 31
     });
+    gameParticles.push(particle);
   }
 }
 
@@ -149,8 +191,12 @@ function updateGameEffects() {
     particle.vx *= 0.97;
     particle.vy *= 0.97;
     particle.life -= 1;
-    if (particle.life <= 0) gameParticles.splice(index, 1);
+    if (particle.life <= 0) {
+      gameParticles.splice(index, 1);
+      if (gameParticlePool.length < 300) gameParticlePool.push(particle);
+    }
   }
+  if (typeof GameJuice !== "undefined") GameJuice.update();
   for (const invader of invaders) {
     if (invader.flashTimer > 0) invader.flashTimer -= 1;
   }
@@ -185,6 +231,10 @@ function damageBrick(index, targetBall) {
   if (brick.type === "portal" && brick.portalCooldown <= 0) {
     const other = bricks.find((candidate, candidateIndex) => candidateIndex !== index && candidate.type === "portal");
     if (other) {
+      emitMechanicsJuice("portal", brick.x + brick.width / 2, brick.y + brick.height / 2,
+        { color: gameTheme.accentSecondary });
+      emitMechanicsJuice("portal", other.x + other.width / 2, other.y + other.height / 2,
+        { color: gameTheme.accentSecondary, exit: true });
       targetBall.x = other.x + other.width / 2 - targetBall.width / 2;
       targetBall.y = other.y + other.height + 2;
       brick.portalCooldown = 45;
@@ -196,13 +246,26 @@ function damageBrick(index, targetBall) {
     const speed = Math.hypot(targetBall.vx, targetBall.vy);
     targetBall.vx = Math.cos(angle) * speed;
     targetBall.vy = Math.sin(angle) * speed;
+    emitMechanicsJuice("forcefield", brick.x + brick.width / 2, brick.y + brick.height / 2,
+      { color: gameTheme.accentSecondary });
     return;
   }
+  emitMechanicsJuice("brick-hit", brick.x + brick.width / 2, brick.y + brick.height / 2, {
+    color: brick.type === "golden" ? gameTheme.accentSecondary : brick.type === "frozen"
+      ? gameTheme.accentTertiary : gameTheme.brick,
+    armored: brick.type === "armored",
+    electric: brick.type === "electric",
+    directionX: targetBall.vx,
+    directionY: targetBall.vy
+  });
   spawnParticles(targetBall.x + targetBall.width / 2, targetBall.y + targetBall.height / 2, brick.type === "frozen" ? gameTheme.accentTertiary : gameTheme.brick, 3, 1.1);
   if (brick.corruptionRepair) {
     maybeAddCorruptionRepairBonus(brick);
   }
-  playGameSound("brick");
+  playGameSound(brick.type === "electric" ? "electric"
+    : brick.type === "portal" ? "portal"
+      : brick.type === "frozen" ? "frozen"
+        : brick.type === "armored" ? "armored" : "brick");
   registerTargetHit(brick.type === "golden" ? 100 : 10);
   brick.health -= 1;
   if (brick.health > 0) {
@@ -215,13 +278,30 @@ function damageBrick(index, targetBall) {
 function destroyBrick(index) {
   const [brick] = bricks.splice(index, 1);
   if (!brick) return;
+  emitMechanicsJuice("brick-break", brick.x + brick.width / 2, brick.y + brick.height / 2, {
+    color: brick.type === "golden" ? gameTheme.accentSecondary
+      : brick.type === "frozen" ? gameTheme.accentTertiary
+        : brick.type === "electric" ? gameTheme.accentSecondary : gameTheme.brick,
+    explosive: brick.type === "explosive",
+    frozen: brick.type === "frozen",
+    electric: brick.type === "electric",
+    armored: brick.type === "armored",
+    golden: brick.type === "golden",
+    portal: brick.type === "portal",
+    chain: brick.type === "chain",
+    regenerating: brick.type === "regenerating",
+    moving: brick.type === "moving"
+  });
   chargeSpecialAbility(3);
   if (brick.corruptionRepair) {
     maybeAddCorruptionRepairBonus(brick);
   }
   spawnParticles(brick.x + brick.width / 2, brick.y + brick.height / 2, brick.type === "golden" ? gameTheme.accentSecondary : gameTheme.brick, 10, 2.7);
   cameraShake = Math.max(cameraShake, 1.4);
-  playGameSound("destroy");
+  playGameSound(brick.type === "explosive" ? "explosive"
+    : brick.type === "golden" ? "reward"
+      : brick.type === "electric" ? "electric"
+        : brick.type === "portal" ? "portal" : "destroy");
   recordDestroyedBrick();
   dropPowerUp(brick.x + brick.width / 2, brick.y, 0.14);
   if (brick.type === "explosive") {
@@ -247,11 +327,20 @@ function damageInvader(index, targetBall) {
   if (!invader || invader.intangible || (invader.type !== "shield-generator" && isInvaderShielded(invader))) return;
   if (invader.corruptionRepair) maybeAddCorruptionRepairBonus(invader);
   invader.flashTimer = 7;
+  emitMechanicsJuice("enemy-hit", invader.x + invader.width / 2, invader.y + invader.height / 2,
+    { color: gameTheme.enemy, directionX: targetBall.vx, directionY: targetBall.vy });
   spawnParticles(targetBall.x + targetBall.width / 2, targetBall.y + targetBall.height / 2, gameTheme.enemy, 4, 1.4);
   playGameSound("enemy");
   invader.health -= 1;
   if (invader.health > 0) return;
   const [destroyed] = invaders.splice(index, 1);
+  emitMechanicsJuice("enemy-defeat", destroyed.x + destroyed.width / 2, destroyed.y + destroyed.height / 2, {
+    color: destroyed.variant === "wither-storm" ? "#d77bea"
+      : destroyed.variant === "galactic-commander" ? "#00D5FF" : gameTheme.accent,
+    boss: destroyed.type === "boss",
+    label: destroyed.variant === "wither-storm" ? "WITHER STORM DEFEATED"
+      : destroyed.variant === "galactic-commander" ? "COMMANDER ELIMINATED" : "BOSS DEFEATED"
+  });
   chargeSpecialAbility(3);
   spawnParticles(destroyed.x + destroyed.width / 2, destroyed.y + destroyed.height / 2, gameTheme.accent, destroyed.type === "boss" ? 24 : 12, 3.2);
   cameraShake = Math.max(cameraShake, destroyed.type === "boss" ? 5 : 2.2);
@@ -264,7 +353,7 @@ function damageInvader(index, targetBall) {
       spawnGalacticBossFragments(destroyed);
       galacticBossDefeatReward = 3000 + 5000;
       registerBonusPoints(5000);
-      playGameSound("destroy");
+      playGameSound("boss");
     }
     if (activeMode === "campaign" || activeMode === "boss_rush") lives += 1;
   }
@@ -309,6 +398,9 @@ function updateMechanics() {
       if (brick.regenTimer <= 0) {
         brick.health += 1;
         brick.regenTimer = 360;
+        emitMechanicsJuice("brick-hit", brick.x + brick.width / 2, brick.y + brick.height / 2,
+          { color: gameTheme.accentTertiary, armored: true });
+        playGameSound("regenerate");
       }
     }
     if (brick.portalCooldown > 0) brick.portalCooldown -= 1;
@@ -318,6 +410,15 @@ function updateMechanics() {
     if (invader.type === "boss") {
       const healthRatio = invader.health / invader.maxHealth;
       invader.phase = healthRatio > 0.66 ? 1 : healthRatio > 0.33 ? 2 : 3;
+      if (typeof GameJuice !== "undefined" &&
+          invader._juicePhase !== undefined && invader._juicePhase !== invader.phase) {
+        emitMechanicsJuice("boss-phase", invader.x + invader.width / 2, invader.y + invader.height / 2, {
+          color: invader.variant === "wither-storm" ? "#d77bea" : gameTheme.accent,
+          label: `PHASE ${invader.phase}`,
+          bossY: invader.y + invader.height + 26
+        });
+      }
+      invader._juicePhase = invader.phase;
     }
   }
   updateFallingPowerUps();
@@ -522,6 +623,11 @@ function updateFallingPowerUps() {
 
 function collectPowerUp(powerUp) {
   playPickupSound(powerUp.id);
+  emitMechanicsJuice("power-up", powerUp.x + powerUp.width / 2, powerUp.y + powerUp.height / 2, {
+    color: powerUp.color,
+    label: powerUp.name.toUpperCase(),
+    multiball: powerUp.id === "multiball"
+  });
   if (powerUp.id === "multiball") {
     const sourceBall = balls[0] || ball;
     for (const direction of [-1, 1]) {
@@ -588,6 +694,7 @@ function catchBall(targetBall, targetPaddle = paddle) {
 function applyShockwave() {
   const centerX = paddle.x + paddle.width / 2;
   const centerY = paddle.y - 150;
+  emitMechanicsJuice("shockwave", centerX, centerY, { color: "#ffad42" });
   for (let index = bricks.length - 1; index >= 0; index -= 1) {
     const brick = bricks[index];
     if (brick.type !== "indestructible" &&
@@ -663,17 +770,34 @@ function playPickupSound(id) {
   const gain = soundContext.createGain();
   const pitch = POWER_UPS.findIndex((powerUp) => powerUp.id === id);
   oscillator.frequency.value = 320 + pitch * 38;
-  oscillator.type = id === "life" ? "sine" : "triangle";
+  oscillator.type = id === "life" || id === "double" || id === "multiball"
+    ? "sine" : id === "laser" || id === "piercing" ? "sawtooth" : "triangle";
   gain.gain.setValueAtTime(0.08 * interfaceData.settings.sfxVolume, soundContext.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, soundContext.currentTime + 0.16);
   oscillator.connect(gain);
   gain.connect(soundContext.destination);
+  oscillator.onended = () => {
+    oscillator.disconnect();
+    gain.disconnect();
+  };
   oscillator.start();
   oscillator.stop(soundContext.currentTime + 0.16);
 }
 
 function drawPowerUps() {
   for (const powerUp of fallingPowerUps) {
+    if (interfaceData.settings.decorativeEffects !== false && !interfaceData.settings.reducedMotion) {
+      ctx.save();
+      ctx.globalAlpha = 0.28 + (Math.sin(movingTick / 8 + powerUp.x) + 1) * 0.18;
+      ctx.strokeStyle = powerUp.color;
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = powerUp.color;
+      ctx.shadowBlur = 4 * (typeof GameJuice === "undefined" ? 1 : GameJuice.getQuality().glow);
+      ctx.beginPath();
+      ctx.arc(powerUp.x + 12, powerUp.y + 12, 14 + Math.sin(movingTick / 10 + powerUp.y) * 1.5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
     ctx.fillStyle = powerUp.color;
     ctx.beginPath();
     if (powerUp.shape === "wide") {
@@ -754,9 +878,14 @@ function drawPowerUps() {
   }
   if (shieldCharges > 0) {
     ctx.strokeStyle = gameTheme.accentSecondary;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = interfaceData.settings.decorativeEffects === false
+      ? 1 : 0.7 + Math.sin(movingTick / 10) * 0.2;
     ctx.beginPath();
     ctx.arc(paddle.x + paddle.width / 2, paddle.y + 12, paddle.width / 2 + 8, Math.PI, Math.PI * 2);
     ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 1;
   }
   if (shockwaveTimer > 0) {
     ctx.strokeStyle = `rgba(255, 173, 66, ${shockwaveTimer / 30})`;
