@@ -785,6 +785,7 @@ function drawThemePreview() {
     ctx.shadowBlur = 10;
     ctx.fillRect(Math.min(width - 96, Math.max(24, ballX - 32)), height - 26, 64, 7);
     ctx.shadowBlur = 0;
+    drawNicoTextureMosaic(ctx, width, height, 0.28);
     ctx.strokeStyle = `${gameTheme.accent}88`;
     ctx.strokeRect(8, 8, width - 16, height - 16);
     themePreviewTick += 1;
@@ -1412,6 +1413,7 @@ function startMenuBackground() {
     gradient.addColorStop(1, gameTheme.surface);
     context.fillStyle = gradient;
     context.fillRect(0, 0, canvas.width, canvas.height);
+    drawNicoTextureMosaic(context, canvas.width, canvas.height, 0.28);
     for (const star of menuStars) {
       star.y += star.speed;
       if (star.y > canvas.height) star.y = 0;
@@ -1432,6 +1434,10 @@ function startMenuBackground() {
   };
   drawBackground();
 }
+
+document.addEventListener("nico-theme-assets-loaded", () => {
+  if (themePreviewActive) drawThemePreview();
+});
 
 function saveSessionProgress() {
   interfaceData.save = { mode: activeMode, level, score, lives };

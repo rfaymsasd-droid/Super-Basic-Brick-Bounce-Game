@@ -1,5 +1,12 @@
-function emitCollisionJuice(type, x, y, options) {
-  if (typeof GameJuice !== "undefined") GameJuice.emit(type, x, y, options);
+function emitCollisionJuice(type, x, y, options, targetBall) {
+  if (typeof GameJuice !== "undefined") {
+    GameJuice.emit(type, x, y, options);
+    if (targetBall) {
+      const variant = options.bounceVariant ||
+        (type === "paddle-hit" ? options.perfect ? "perfect" : "paddle" : "target");
+      GameJuice.bounce(targetBall, variant);
+    }
+  }
 }
 
 function boxesTouch(a, b) {
@@ -18,7 +25,7 @@ function bounceOffWalls(targetBall = ball) {
     playGameSound("wall");
     spawnParticles(targetBall.x, targetBall.y + targetBall.height / 2, gameTheme.accentSecondary, 2, 0.8);
     emitCollisionJuice("ball-hit", targetBall.x, targetBall.y + targetBall.height / 2,
-      { color: gameTheme.accentSecondary, directionX: 1 });
+      { color: gameTheme.accentSecondary, directionX: 1, bounceVariant: "wall" }, targetBall);
   }
   if (targetBall.x + targetBall.width > WIDTH) {
     targetBall.x = WIDTH - targetBall.width;
@@ -26,7 +33,7 @@ function bounceOffWalls(targetBall = ball) {
     playGameSound("wall");
     spawnParticles(targetBall.x + targetBall.width, targetBall.y + targetBall.height / 2, gameTheme.accentSecondary, 2, 0.8);
     emitCollisionJuice("ball-hit", targetBall.x + targetBall.width, targetBall.y + targetBall.height / 2,
-      { color: gameTheme.accentSecondary, directionX: -1 });
+      { color: gameTheme.accentSecondary, directionX: -1, bounceVariant: "wall" }, targetBall);
   }
   if (targetBall.y < 0) {
     targetBall.y = 0;
@@ -34,7 +41,7 @@ function bounceOffWalls(targetBall = ball) {
     playGameSound("wall");
     spawnParticles(targetBall.x + targetBall.width / 2, targetBall.y, gameTheme.accentSecondary, 2, 0.8);
     emitCollisionJuice("ball-hit", targetBall.x + targetBall.width / 2, targetBall.y,
-      { color: gameTheme.accentSecondary, directionY: 1 });
+      { color: gameTheme.accentSecondary, directionY: 1, bounceVariant: "ceiling" }, targetBall);
   }
 }
 
@@ -65,7 +72,7 @@ function bounceOffPaddle(targetBall = ball, targetPaddle = paddle) {
       playGameSound("paddle");
     }
     emitCollisionJuice("paddle-hit", targetBall.x + targetBall.width / 2, targetPaddle.y,
-      { color: gameTheme.paddle, perfect: perfectHit, directionX: targetBall.vx });
+      { color: gameTheme.paddle, perfect: perfectHit, directionX: targetBall.vx }, targetBall);
     spawnParticles(targetBall.x + targetBall.width / 2, targetPaddle.y, gameTheme.paddle, 7, 1.7);
   }
 }
@@ -98,7 +105,7 @@ function bounceOffBricks(targetBall = ball) {
 
     spawnParticles(targetBall.x + targetBall.width / 2, targetBall.y + targetBall.height / 2, gameTheme.brick, 2, 0.8);
     emitCollisionJuice("ball-hit", targetBall.x + targetBall.width / 2, targetBall.y + targetBall.height / 2,
-      { color: gameTheme.brick, directionX: targetBall.vx, directionY: targetBall.vy });
+      { color: gameTheme.brick, directionX: targetBall.vx, directionY: targetBall.vy }, targetBall.piercing ? null : targetBall);
     damageBrick(index, targetBall);
     break;
   }
@@ -139,6 +146,7 @@ function bounceOffInvaders(targetBall = ball) {
     }
 
     targetBall.lastInvaderHitIndex = index;
+    if (typeof GameJuice !== "undefined") GameJuice.bounce(targetBall, "target");
     damageInvader(index, targetBall);
     break;
   }

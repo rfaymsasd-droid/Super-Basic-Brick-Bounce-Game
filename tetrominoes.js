@@ -702,19 +702,25 @@ function resolveTetrominoBallCollision(targetBall) {
       const overlapY = Math.min(ballBottom, squareBottom) - Math.max(targetBall.y, squareY);
       const ballVelocityX = targetBall.vx * speedFactor;
       const ballVelocityY = targetBall.vy * speedFactor;
+      let bounced = false;
       if (overlapX < overlapY) {
         const hitLeft = targetBall.x + targetBall.width / 2 < squareX + piece.cellSize / 2;
         targetBall.x = hitLeft ? squareX - targetBall.width : squareRight;
         const normalX = hitLeft ? -1 : 1;
-        if ((ballVelocityX - piece.vx) * normalX < 0) targetBall.vx = -targetBall.vx;
+        if ((ballVelocityX - piece.vx) * normalX < 0) {
+          targetBall.vx = -targetBall.vx;
+          bounced = true;
+        }
       } else {
         const hitTop = targetBall.y + targetBall.height / 2 < squareY + piece.cellSize / 2;
         targetBall.y = hitTop ? squareY - targetBall.height : squareBottom;
         const normalY = hitTop ? -1 : 1;
         if ((ballVelocityY - piece.vy) * normalY < 0) {
           targetBall.vy = (2 * piece.vy - ballVelocityY) / speedFactor;
+          bounced = true;
         }
       }
+      if (bounced && typeof GameJuice !== "undefined") GameJuice.bounce(targetBall, "obstacle");
       if (interfaceData.settings.tetrisEffects && settings.visualIntensity > 0) {
         const intensity = settings.visualIntensity;
         spawnParticles(targetBall.x + targetBall.width / 2, targetBall.y + targetBall.height / 2,

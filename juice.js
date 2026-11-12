@@ -9,6 +9,14 @@ const GameJuice = (() => {
   const pool = [];
   const labels = [];
   const labelPool = [];
+  const bounceVariants = {
+    wall: { scaleX: 0.72, scaleY: 1.16, rotation: 0 },
+    ceiling: { scaleX: 1.16, scaleY: 0.72, rotation: 0 },
+    paddle: { scaleX: 1.2, scaleY: 0.7, rotation: 0 },
+    perfect: { scaleX: 1.3, scaleY: 0.62, rotation: 0 },
+    target: { scaleX: 0.78, scaleY: 1.16, rotation: 0.16 },
+    obstacle: { scaleX: 0.84, scaleY: 1.14, rotation: -0.2 }
+  };
   let cameraX = 0;
   let cameraY = 0;
   let randomState = ((Date.now() ^ 0x9e3779b9) >>> 0) || 0x6d2b79f5;
@@ -32,6 +40,34 @@ const GameJuice = (() => {
     return settings().decorativeEffects !== false &&
       settings().effectsIntensity !== 0 &&
       settings().reducedMotion !== true;
+  }
+
+  function bounce(ball, variant = "target") {
+    if (!ball || !enabled()) return;
+    ball.bounceJuice = {
+      variant: bounceVariants[variant] ? variant : "target",
+      age: 0,
+      duration: 9
+    };
+  }
+
+  function updateBallBounce(ball) {
+    if (!ball?.bounceJuice) return;
+    ball.bounceJuice.age += 1;
+    if (ball.bounceJuice.age >= ball.bounceJuice.duration) delete ball.bounceJuice;
+  }
+
+  function getBallBounceTransform(ball) {
+    const effect = ball?.bounceJuice;
+    const variant = effect && bounceVariants[effect.variant];
+    if (!enabled() || !effect || !variant) return { scaleX: 1, scaleY: 1, rotation: 0 };
+    const progress = Math.max(0, Math.min(1, effect.age / effect.duration));
+    const pulse = Math.sin(progress * Math.PI);
+    return {
+      scaleX: 1 + (variant.scaleX - 1) * pulse,
+      scaleY: 1 + (variant.scaleY - 1) * pulse,
+      rotation: variant.rotation * pulse
+    };
   }
 
   function acquire(values) {
@@ -286,5 +322,8 @@ const GameJuice = (() => {
     return quality();
   }
 
-  return { emit, update, draw, clear, applyCamera, getQuality, enabled, random };
+  return {
+    emit, update, draw, clear, applyCamera, getQuality, enabled, random,
+    bounce, updateBallBounce, getBallBounceTransform
+  };
 })();

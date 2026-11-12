@@ -1,4 +1,4 @@
-const CACHE_NAME = "vector-break-shell-v11";
+const CACHE_NAME = "vector-break-shell-v12";
 const LEGACY_CACHE_NAME = "vector-break-legacy-v1";
 const APP_SHELL = [
   "./",
@@ -17,6 +17,10 @@ const APP_SHELL = [
   "./ui.js",
   "./manifest.webmanifest",
   "./icon.svg",
+  "./IMG_20261112_113401.jpg",
+  "./IMG_20261112_113403.jpg",
+  "./IMG_20261112_113411.jpg",
+  "./IMG_20261112_113421.jpg",
   "./legacy/index.html",
   "./legacy/styles.css",
   "./legacy/game.js",

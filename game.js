@@ -216,6 +216,7 @@ function update() {
   updateTetrominoes();
   for (let index = balls.length - 1; index >= 0; index -= 1) {
     const targetBall = balls[index];
+    GameJuice.updateBallBounce(targetBall);
     if (targetBall.caught) continue;
     applyGalacticBeamForce(targetBall);
     applyWitherStormPull(targetBall);
@@ -749,7 +750,13 @@ function draw() {
     ctx.shadowColor = ctx.fillStyle;
     ctx.shadowBlur = interfaceData.settings.decorativeEffects === false ? 0
       : 7 * interfaceData.settings.effectsIntensity * visualQuality.glow;
-    drawSquircle(targetBall.x, targetBall.y, targetBall.width, targetBall.height);
+    const bounce = GameJuice.getBallBounceTransform(targetBall);
+    ctx.save();
+    ctx.translate(targetBall.x + targetBall.width / 2, targetBall.y + targetBall.height / 2);
+    ctx.rotate(bounce.rotation);
+    ctx.scale(bounce.scaleX, bounce.scaleY);
+    drawSquircle(-targetBall.width / 2, -targetBall.height / 2, targetBall.width, targetBall.height);
+    ctx.restore();
     ctx.shadowBlur = 0;
   }
   drawBricks();
@@ -769,6 +776,8 @@ function draw() {
     ctx.stroke();
   }
   ctx.restore();
+
+  drawNicoTextureMosaic(ctx, WIDTH, HEIGHT, 0.18);
 
   if (paused || gameOver || !started) {
     ctx.fillStyle = "rgba(0, 0, 0, 0.72)";

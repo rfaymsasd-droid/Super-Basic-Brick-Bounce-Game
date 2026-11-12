@@ -78,8 +78,32 @@ const THEME_PRESETS = Object.freeze({
     brick: "#64FFDA",
     enemy: "#FFE66D",
     projectile: "#FF6B6B"
+  },
+  nico: {
+    id: "nico",
+    name: "Nico",
+    description: "A photo-textured theme built from your four images.",
+    background: "#111116",
+    surface: "#24232A",
+    accent: "#E98A79",
+    accentSecondary: "#B8D3DB",
+    accentTertiary: "#E7C7A7",
+    text: "#FFF9F2",
+    paddle: "#FFF9F2",
+    ball: "#FFF9F2",
+    brick: "#E98A79",
+    enemy: "#B8D3DB",
+    projectile: "#E7C7A7"
   }
 });
+
+const NICO_TEXTURE_PATHS = Object.freeze([
+  "./IMG_20261112_113401.jpg",
+  "./IMG_20261112_113403.jpg",
+  "./IMG_20261112_113411.jpg",
+  "./IMG_20261112_113421.jpg"
+]);
+let NICO_TEXTURE_IMAGES = [];
 
 const CUSTOM_THEME_FIELDS = [
   { key: "background", label: "Background Color" },
@@ -95,6 +119,58 @@ const CUSTOM_THEME_FIELDS = [
 ];
 
 let gameTheme = { ...THEME_PRESETS.crimson };
+
+function loadNicoTextures() {
+  if (NICO_TEXTURE_IMAGES.length || typeof Image === "undefined") return;
+  NICO_TEXTURE_IMAGES = NICO_TEXTURE_PATHS.map((path) => {
+    const image = new Image();
+    image.onload = () => {
+      if (typeof document !== "undefined") document.dispatchEvent(new Event("nico-theme-assets-loaded"));
+    };
+    image.onerror = () => console.error(`Unable to load Nico theme image: ${path}`);
+    image.src = path;
+    return image;
+  });
+}
+
+function drawNicoTexture(context, x, y, width, height, index = 0, opacity = 0.3) {
+  if (gameTheme.id !== "nico" || width <= 0 || height <= 0) return false;
+  loadNicoTextures();
+  if (!NICO_TEXTURE_IMAGES.length) return false;
+  const image = NICO_TEXTURE_IMAGES[Math.abs(Math.trunc(index)) % NICO_TEXTURE_IMAGES.length];
+  if (!image.complete || !image.naturalWidth) return false;
+
+  const destinationRatio = width / height;
+  const imageRatio = image.naturalWidth / image.naturalHeight;
+  let sourceX = 0;
+  let sourceY = 0;
+  let sourceWidth = image.naturalWidth;
+  let sourceHeight = image.naturalHeight;
+  if (imageRatio > destinationRatio) {
+    sourceWidth = image.naturalHeight * destinationRatio;
+    sourceX = (image.naturalWidth - sourceWidth) / 2;
+  } else {
+    sourceHeight = image.naturalWidth / destinationRatio;
+    sourceY = (image.naturalHeight - sourceHeight) / 2;
+  }
+
+  context.save();
+  context.globalAlpha *= opacity;
+  context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, x, y, width, height);
+  context.restore();
+  return true;
+}
+
+function drawNicoTextureMosaic(context, width, height, opacity = 0.2) {
+  if (gameTheme.id !== "nico") return;
+  const halfWidth = width / 2;
+  const halfHeight = height / 2;
+  for (let index = 0; index < NICO_TEXTURE_IMAGES.length; index += 1) {
+    const x = index % 2 * halfWidth;
+    const y = Math.floor(index / 2) * halfHeight;
+    drawNicoTexture(context, x, y, halfWidth, halfHeight, index, opacity);
+  }
+}
 
 function isValidThemeColor(value) {
   return typeof value === "string" && /^#[\da-f]{6}$/i.test(value);
@@ -120,6 +196,7 @@ function isReadableTheme(theme) {
 
 function setGameTheme(theme) {
   gameTheme = { ...theme };
+  if (gameTheme.id === "nico") loadNicoTextures();
   if (typeof document === "undefined") return;
 
   const root = document.documentElement;

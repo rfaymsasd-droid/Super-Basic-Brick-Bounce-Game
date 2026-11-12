@@ -29,6 +29,45 @@ body {
   transition: background-color 300ms ease, color 300ms ease;
 }
 
+body[data-theme="nico"] {
+  background-image:
+    linear-gradient(rgba(12, 12, 16, .78), rgba(12, 12, 16, .86)),
+    url("./IMG_20261112_113401.jpg"),
+    url("./IMG_20261112_113403.jpg"),
+    url("./IMG_20261112_113411.jpg"),
+    url("./IMG_20261112_113421.jpg");
+  background-position: center, left top, right top, left bottom, right bottom;
+  background-size: auto, 50% 50%, 50% 50%, 50% 50%, 50% 50%;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+body[data-theme="nico"] .content-screen,
+body[data-theme="nico"] .dialog-card,
+body[data-theme="nico"] .theme-dialog,
+body[data-theme="nico"] .menu-directory-panel,
+body[data-theme="nico"] .theme-card[data-theme="nico"],
+body[data-theme="nico"] button,
+body[data-theme="nico"] select {
+  background-image:
+    linear-gradient(rgba(20, 19, 24, .86), rgba(20, 19, 24, .9)),
+    url("./IMG_20261112_113401.jpg");
+  background-size: cover;
+  background-position: center;
+}
+
+body[data-theme="nico"] .theme-card[data-theme="nico"] .theme-card-preview {
+  background-image:
+    linear-gradient(rgba(17, 17, 22, .58), rgba(17, 17, 22, .68)),
+    url("./IMG_20261112_113401.jpg"),
+    url("./IMG_20261112_113403.jpg"),
+    url("./IMG_20261112_113411.jpg"),
+    url("./IMG_20261112_113421.jpg");
+  background-position: center, left top, right top, left bottom, right bottom;
+  background-size: auto, 50% 50%, 50% 50%, 50% 50%, 50% 50%;
+  background-repeat: no-repeat;
+}
+
 #menu-background {
   position: fixed;
   inset: 0;

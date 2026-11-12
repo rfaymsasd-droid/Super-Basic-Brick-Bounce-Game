@@ -193,6 +193,88 @@ test('visual quality presets normalize old saves and cap only decorative feedbac
   assert.match(serviceWorker, /"\.\/juice\.js"/);
 });
 
+test('ball bounce juice has six distinct, temporary variants and respects reduced motion', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'juice.js'), 'utf8');
+  const context = {
+    Math,
+    Date,
+    WIDTH: 400,
+    HEIGHT: 600,
+    gameTheme: { accentSecondary: '#fff' },
+    interfaceData: { settings: { visualQuality: 'balanced', effectsIntensity: 1, decorativeEffects: true, reducedMotion: false } }
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+
+  const transforms = JSON.parse(vm.runInContext(`
+    (() => {
+      const ball = {};
+      const variants = ['wall', 'ceiling', 'paddle', 'perfect', 'target', 'obstacle'];
+      const results = variants.map((variant) => {
+        GameJuice.bounce(ball, variant);
+        GameJuice.updateBallBounce(ball);
+        return GameJuice.getBallBounceTransform(ball);
+      });
+      for (let frame = 1; frame < 9; frame += 1) GameJuice.updateBallBounce(ball);
+      results.push(GameJuice.getBallBounceTransform(ball));
+      return JSON.stringify(results);
+    })()
+  `, context));
+
+  assert.equal(new Set(transforms.slice(0, 6).map((transform) => JSON.stringify(transform))).size, 6);
+  assert.deepEqual(transforms[6], { scaleX: 1, scaleY: 1, rotation: 0 }, 'The ball returns to its normal shape');
+  const reducedMotionResult = JSON.parse(vm.runInContext(`
+    (() => {
+      interfaceData.settings.reducedMotion = true;
+      const ball = {};
+      GameJuice.bounce(ball, 'paddle');
+      return JSON.stringify({ active: Boolean(ball.bounceJuice), scaleX: GameJuice.getBallBounceTransform(ball).scaleX });
+    })()
+  `, context));
+  assert.deepEqual(reducedMotionResult, { active: false, scaleX: 1 });
+});
+
+test('Nico is an optional photo-textured theme and keeps Crimson Arcade as default', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'themes.js'), 'utf8');
+  class LoadedImage {
+    constructor() {
+      this.complete = true;
+      this.naturalWidth = 1280;
+      this.naturalHeight = 960;
+    }
+
+    set src(value) {
+      this.path = value;
+    }
+  }
+  const context = { Image: LoadedImage, console };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+
+  assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify({ selected: gameTheme.id, nico: THEME_PRESETS.nico.name, paths: NICO_TEXTURE_PATHS })', context)), {
+    selected: 'crimson',
+    nico: 'Nico',
+    paths: [
+      './IMG_20261112_113401.jpg',
+      './IMG_20261112_113403.jpg',
+      './IMG_20261112_113411.jpg',
+      './IMG_20261112_113421.jpg'
+    ]
+  });
+  assert.equal(vm.runInContext('NICO_TEXTURE_IMAGES.length', context), 0, 'Non-default theme images are not loaded at startup');
+
+  const textured = [];
+  context.textureContext = {
+    globalAlpha: 1,
+    save() {},
+    restore() {},
+    drawImage(image) { textured.push(image.path); }
+  };
+  vm.runInContext('setGameTheme(THEME_PRESETS.nico); drawNicoTextureMosaic(textureContext, 400, 300)', context);
+  assert.equal(textured.length, 4, 'The Nico texture mosaic uses each available photo');
+  assert.equal(vm.runInContext('gameTheme.id', context), 'nico');
+});
+
 test('brick catalog includes the electric brick type', () => {
   const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'bricks.js'), 'utf8');
   const context = {
